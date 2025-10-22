@@ -1,0 +1,6 @@
+@EasyBilling.Api_HostAddress = http://localhost:5055
+
+GET {{EasyBilling.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
