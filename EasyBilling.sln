@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36518.9 d17.14
+VisualStudioVersion = 17.14.36518.9
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.Domain", "EasyBilling.Domain\EasyBilling.Domain.csproj", "{52670A31-BD09-46DD-9430-3A753A22E1E1}"
 EndProject
@@ -10,8 +10,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.Application", "EasyBilling.Application\EasyBilling.Application.csproj", "{A07AFAD0-DC2A-436B-8EF9-5D46DEB393B2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.Presentation", "EasyBilling.Presentation\EasyBilling.Presentation.csproj", "{8ED55A77-1430-4A76-9676-1909B16785DC}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBillings.Tests", "EasyBillings.Tests\EasyBillings.Tests.csproj", "{21B07890-8899-412C-9167-409D3A332A1E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +33,6 @@ Global
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{21B07890-8899-412C-9167-409D3A332A1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{21B07890-8899-412C-9167-409D3A332A1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{21B07890-8899-412C-9167-409D3A332A1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{21B07890-8899-412C-9167-409D3A332A1E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
