@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f1f1f1;
+        }
+
+        .invoice-wrapper {
+            width: 900px;
+            margin: 20px auto;
+            background: #ffffff;
+            border: 1px solid #dcdcdc;
+            padding: 35px 40px 50px 40px;
+        }
+
+        .invoice-header-title {
+            font-size: 44px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #285873;
+            margin-bottom: 10px;
+        }
+
+        .invoice-topline {
+            background: #315f7e;
+            color: #ffffff;
+            padding: 8px 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 35px;
+        }
+
+            .invoice-topline span {
+                margin-right: 3px;
+            }
+
+        .invoice-topline-right span {
+            margin-left: 2px;
+        }
+
+        .invoice-topline strong {
+            font-weight: 700;
+        }
+
+        .invoice-section {
+            margin-bottom: 30px;
+        }
+
+        .invoice-two-cols {
+            display: flex;
+            justify-content: space-between;
+            gap: 80px;
+        }
+
+        .invoice-col {
+            flex: 1;
+        }
+
+        .section-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #285873;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .party-name {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .party-line {
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+            .party-line strong {
+                font-weight: 700;
+            }
+
+        .products-header-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #285873;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        table.invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+            table.invoice-table th,
+            table.invoice-table td {
+                padding: 8px 6px;
+            }
+
+            table.invoice-table thead th {
+                border-bottom: 1px solid #cfcfcf;
+                font-weight: 700;
+                text-align: left;
+            }
+
+                table.invoice-table thead th.number,
+                table.invoice-table tbody td.number,
+                table.invoice-table thead th.center,
+                table.invoice-table tbody td.center {
+                    text-align: center;
+                }
+
+                table.invoice-table thead th.right,
+                table.invoice-table tbody td.right {
+                    text-align: right;
+                }
+
+            table.invoice-table tbody tr.item-row td {
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+        .totals-row-label {
+            padding-top: 12px;
+            font-size: 13px;
+        }
+
+        .totals-row {
+            font-size: 13px;
+        }
+
+        .grand-total-wrapper {
+            margin-top: 10px;
+        }
+
+        .grand-total-box {
+            background: #d2dde4;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+            .grand-total-box span:first-child {
+                font-weight: 600;
+            }
+
+        .footer-section {
+            margin-top: 120px;
+            font-size: 12px;
+        }
+
+        .footer-prepared-by {
+            margin-bottom: 30px;
+        }
+
+            .footer-prepared-by span:first-child {
+                font-weight: 600;
+            }
+
+        .footer-line-separator {
+            border-top: 1px solid #d0d0d0;
+            margin-bottom: 15px;
+        }
+
+        .footer-company.-name {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .footer-text-line {
+            margin-bottom: 2px;
+        }
+
+        .footer-bottom-row {
+            margin-top: 6px;
+            font-size: 11px;
+        }
+
+            .footer-bottom-row a {
+                text-decoration: underline;
+            }
+
+        @media print {
+            body {
+                background: #ffffff;
+            }
+
+            .invoice-wrapper {
+                margin: 0;
+                border: none;
+                width: auto;
+                padding: 20mm 18mm 20mm 18mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-wrapper">
+
+        <!-- TITLU -->
+        <div class="invoice-header-title">FACTURA</div>
+
+        <!-- BARA ALBASTRA CU SERIE / DATA / TVA -->
+        <div class="invoice-topline">
+            <div class="invoice-topline-left">
+                <span>Seria</span>
+                <span>{{ invoice.series }}</span>
+                <span>Nr.</span>
+                <span>{{ invoice.number }}</span>
+                <span>din</span>
+                <span><strong>{{ invoice.date }}</strong></span>
+            </div>
+            <div class="invoice-topline-right">
+                <span>Cota TVA</span>
+                <span><strong>{{ invoice.vat_rate }}</strong></span>
+                <span>&nbsp;&nbsp;</span>
+                <span><strong>{{ invoice.vat_label }}</strong></span>
+            </div>
+        </div>
+
+        <!-- FURNIZOR / CLIENT -->
+        <div class="invoice-section invoice-two-cols">
+            <div class="invoice-col">
+                <div class="section-label">Furnizor</div>
+                <div class="party-name">{{ company.name }}</div>
+                <div class="party-line"><strong>CIF:</strong> {{ company.cui }}</div>
+                <div class="party-line"><strong>Reg. com.:</strong> {{ company.reNumber }}</div>
+                <div class="party-line">
+                    <strong>Adresa:</strong> {{ company.address }}
+                </div>
+                <div class="party-line"><strong>Judet:</strong> {{ company.county }}</div>
+                <div class="party-line"><strong>IBAN(RON):</strong> {{ company.iban }}</div>
+                <div class="party-line"><strong>Banca:</strong> {{ company.bank }}</div>
+            </div>
+
+            <div class="invoice-col">
+                <div class="section-label">Client</div>
+                <div class="party-name">{{ client.name }}</div>
+                <div class="party-line"><strong>CIF:</strong> {{ client.cif }}</div>
+                <div class="party-line"><strong>Reg. com.:</strong> {{ client.reg_com }}</div>
+                <div class="party-line">
+                    <strong>Adresa:</strong> {{ client.address }}
+                </div>
+                <div class="party-line"><strong>Judet:</strong> {{ client.county }}</div>
+                <div class="party-line"><strong>Tara:</strong> {{ client.country }}</div>
+            </div>
+        </div>
+
+        <!-- TABEL PRODUSE / SERVICII -->
+        <div class="invoice-section">
+            <div class="products-header-label">Produse/servicii</div>
+
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th class="number">#</th>
+                        <th>Denumire</th>
+                        <th class="center">U.M.</th>
+                        <th class="center">Cant.</th>
+                        <th class="right">
+                            Pret fara TVA<br>
+                            <span style="font-weight:400;font-size:11px;">Lei</span>
+                        </th>
+                        <th class="right">
+                            Valoare<br>
+                            <span style="font-weight:400;font-size:11px;">Lei</span>
+                        </th>
+                        <th class="right">
+                            Valoare TVA<br>
+                            <span style="font-weight:400;font-size:11px;">Lei</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- EXEMPLU UN RAND (in engine-ul de template il poti pune intr-un loop) -->
+                    <tr class="item-row">
+                        <td class="number">{{ item.index }}</td>
+                        <td>{{ item.name }}</td>
+                        <td class="center">{{ item.um }}</td>
+                        <td class="center">{{ item.quantity }}</td>
+                        <td class="right">{{ item.price_without_vat }}</td>
+                        <td class="right">{{ item.value }}</td>
+                        <td class="right">{{ item.vat_value }}</td>
+                    </tr>
+
+                    <!-- R�nd TOTAL (sub tabel) -->
+                    <tr>
+                        <td colspan="4" class="totals-row-label">Total</td>
+                        <td class="right totals-row">{{ totals.price_without_vat }}</td>
+                        <td class="right totals-row">{{ totals.value }}</td>
+                        <td class="right totals-row">{{ totals.vat_value }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- TOTAL FACTURA -->
+            <div class="grand-total-wrapper">
+                <div class="grand-total-box">
+                    <span>Total factura</span>
+                    <span>{{ totals.grand_total }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer-section">
+            <div class="footer-prepared-by">
+                <span>Intocmit de:</span>
+                <span> {{ prepared_by.name }}</span>
+            </div>
+
+            <div class="footer-line-separator"></div>
+
+            <div class="footer-company.-name">{{ company.name }}</div>
+            <div class="footer-text-line">
+                {{ company.footerLine1 }}
+            </div>
+            <div class="footer-text-line">
+                {{ company.footerLine2 }}
+            </div>
+            <div class="footer-text-line">
+                {{ footer.legalText }}
+            </div>
+
+            <div class="footer-bottom-row">
+                {{ footer.software_prefix }}
+                <a href="#">{{ footer.software_name }}</a>, {{ footer.software_suffix }}
+                &nbsp;&nbsp;&nbsp; Cod document: {{ footer.document_code }}
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

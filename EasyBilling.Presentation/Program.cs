@@ -1,6 +1,9 @@
+using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.IServices;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
+using EasyBilling.Infrastructure.Repositories;
+using EasyBilling.Infrastructure.Templates;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +14,9 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 
 builder.Services.AddControllers();
 
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IInvoiceTemplateRender, InvoiceTemplateRender>();
 
 builder.Services.AddOpenApi();
 
