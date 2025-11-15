@@ -1,14 +1,15 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using EasyBilling.Application.Requests;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EasyBilling.Presentation.Controllers.V1
+namespace EasyBilling.Presentation.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class Invoice : ControllerBase
     {
         [HttpPost]
-        public IActionResult GenerateInvoice()
+        public async Task<IActionResult> CreateInvoice(Guid companyId, [FromBody] CreateInvoiceRequest request)
         {
             // Implementation for creating an invoice goes here.
             return Ok("Invoice created successfully.");
