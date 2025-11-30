@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251126231801_AddUserModel")]
+    partial class AddUserModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -69,24 +72,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
-                            Client_Id = new Guid("e8c9d14f-3df0-4ab5-9a72-6c1f4bb3a202"),
-                            Client_Secret = "admin123",
-                            Email = "admin@gmail.com",
-                            Username = "admin"
-                        },
-                        new
-                        {
-                            Id = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
-                            Client_Id = new Guid("c2a4f8b1-6e5d-4f17-91bb-0f92b74f4404"),
-                            Client_Secret = "user123",
-                            Email = "user@gmail.com",
-                            Username = "user"
-                        });
                 });
 #pragma warning restore 612, 618
         }
