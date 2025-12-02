@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251202145610_AddClientModel")]
+    partial class AddClientModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -58,30 +61,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Clients");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("a3f5d9b2-1e34-4d5c-92a4-1d9c4c7b0151"),
-                            Address = "Targu-Jiu, str. Spectaculosilor 14",
-                            Bank = "BCR",
-                            CUI = "RO12345678",
-                            Company_Id = new Guid("c13dbb54-9fc5-4c72-92df-c47e6dfcce21"),
-                            IBAN = "RO49BCRL00001012345678",
-                            Name = "SC Spectacol SRL",
-                            RegNumber = "J40/1234/2010"
-                        },
-                        new
-                        {
-                            Id = new Guid("b7c89fa1-6bd2-4c26-a7ea-3b2cdb0f9e62"),
-                            Address = "Tismana",
-                            Bank = "BT",
-                            CUI = "RO27833491",
-                            Company_Id = new Guid("de45bb29-fb3f-4c53-b9a0-87d13a6cc920"),
-                            IBAN = "RO27BTRL0000123456789012",
-                            Name = "Pandurii Tismana",
-                            RegNumber = "J12/567/2015"
-                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>

@@ -4,5 +4,5 @@ namespace EasyBilling.Application.Interfaces;
 
 public interface IUserService
 {
-    Task<bool> DecodeBasicAuth(string authHeader);
+    Task<bool> DecodeToken(string authHeader);
 }

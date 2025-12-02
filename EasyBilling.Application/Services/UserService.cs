@@ -11,7 +11,7 @@ public class UserService : IUserService
     {
         _repository = repository;
     }
-    public async Task<bool> DecodeBasicAuth(string authHeader)
+    public async Task<bool> DecodeToken(string authHeader)
     {
         if (string.IsNullOrWhiteSpace(authHeader) || 
             !authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
@@ -42,16 +42,13 @@ public class UserService : IUserService
         Guid clientId;
         bool isGuid = Guid.TryParse(parts[0], out clientId);
 
-        if (!isGuid)
-            return false;
+        if (!isGuid) return false;
 
 
         var user = await _repository.GetByClientId(clientIdString, clientSecret);
-        if (user is null)
-            return false;
+        if (user is null) return false;
 
-        if (user.Client_Secret != clientSecret) 
-            return false;
+        if (user.Client_Secret != clientSecret) return false;
 
         return true;
     }
