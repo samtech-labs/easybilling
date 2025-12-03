@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251202154109_AddClientSeeding")]
+    partial class AddClientSeeding
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,51 +97,17 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Bank")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CUI")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("IBAN")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RegNumber")
+                    b.Property<string>("VatCode")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.ToTable("Companies");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("e11e24c2-8c61-4adb-af89-9464ac44964a"),
-                            Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
-                            Bank = "Revolut Bank UAD",
-                            CUI = "RO49311115",
-                            IBAN = "RO49AAAA1B31007593840000",
-                            Name = "SAMTECH LABS SRL",
-                            RegNumber = "J18/1171/2023"
-                        },
-                        new
-                        {
-                            Id = new Guid("40019908-3df7-4764-bbb7-1776e8e23245"),
-                            Address = "Str. Testului 2, Cluj-Napoca, Romania",
-                            Bank = "Banca Transilvania",
-                            CUI = "RO87654321",
-                            IBAN = "RO49BBBB1B31007593840000",
-                            Name = "Demo Client SRL",
-                            RegNumber = "J12/567/2020"
-                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>

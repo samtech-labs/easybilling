@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251202145610_AddClientModel")]
+    partial class AddClientModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -58,30 +61,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Clients");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("a3f5d9b2-1e34-4d5c-92a4-1d9c4c7b0151"),
-                            Address = "Targu-Jiu, str. Spectaculosilor 14",
-                            Bank = "BCR",
-                            CUI = "RO12345678",
-                            Company_Id = new Guid("c13dbb54-9fc5-4c72-92df-c47e6dfcce21"),
-                            IBAN = "RO49BCRL00001012345678",
-                            Name = "SC Spectacol SRL",
-                            RegNumber = "J40/1234/2010"
-                        },
-                        new
-                        {
-                            Id = new Guid("b7c89fa1-6bd2-4c26-a7ea-3b2cdb0f9e62"),
-                            Address = "Tismana",
-                            Bank = "BT",
-                            CUI = "RO27833491",
-                            Company_Id = new Guid("de45bb29-fb3f-4c53-b9a0-87d13a6cc920"),
-                            IBAN = "RO27BTRL0000123456789012",
-                            Name = "Pandurii Tismana",
-                            RegNumber = "J12/567/2015"
-                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
@@ -94,51 +73,17 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Bank")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CUI")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("IBAN")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RegNumber")
+                    b.Property<string>("VatCode")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.ToTable("Companies");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("e11e24c2-8c61-4adb-af89-9464ac44964a"),
-                            Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
-                            Bank = "Revolut Bank UAD",
-                            CUI = "RO49311115",
-                            IBAN = "RO49AAAA1B31007593840000",
-                            Name = "SAMTECH LABS SRL",
-                            RegNumber = "J18/1171/2023"
-                        },
-                        new
-                        {
-                            Id = new Guid("40019908-3df7-4764-bbb7-1776e8e23245"),
-                            Address = "Str. Testului 2, Cluj-Napoca, Romania",
-                            Bank = "Banca Transilvania",
-                            CUI = "RO87654321",
-                            IBAN = "RO49BBBB1B31007593840000",
-                            Name = "Demo Client SRL",
-                            RegNumber = "J12/567/2020"
-                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
