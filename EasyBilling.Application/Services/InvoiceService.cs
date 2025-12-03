@@ -1,5 +1,7 @@
 ﻿using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.IServices;
+using Syncfusion.HtmlConverter;
+using PdfDocument = Syncfusion.Pdf.PdfDocument;
 
 namespace EasyBilling.Application.Services
 {
@@ -19,14 +21,15 @@ namespace EasyBilling.Application.Services
             // Logic to generate invoice using company details
             var invoiceHtml = await _invoiceTemplateRender.RenderAsync(company);
 
-            byte[] result;
-            using (MemoryStream ms = new MemoryStream())
-            {
-                var pdf = TheArtOfDev.HtmlRenderer.PdfSharp.PdfGenerator.GeneratePdf(invoiceHtml, PdfSharp.PageSize.A4);
-                pdf.Save(ms);
-                result = ms.ToArray();
-            }
-            return result;
+            HtmlToPdfConverter htmlConverter = new HtmlToPdfConverter();
+            PdfDocument invoicePdf = htmlConverter.Convert(invoiceHtml, "");
+
+            using var stream = new MemoryStream();
+            invoicePdf.Save(stream);
+            invoicePdf.Close(true);
+            htmlConverter.Close();
+
+            return stream.ToArray();
         }
     }
 }

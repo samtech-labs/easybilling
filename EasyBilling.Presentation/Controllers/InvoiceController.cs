@@ -1,5 +1,4 @@
 ﻿using EasyBilling.Application.IServices;
-using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyBilling.Presentation.Controllers
@@ -19,9 +18,9 @@ namespace EasyBilling.Presentation.Controllers
         [HttpPost("pdf")]
         public async Task<IActionResult> CreateInvoice(Guid companyId)
         {
-            var invoicePdf = await _invoiceService.CreateInvoiceAsync(companyId);
+            var invoice = await _invoiceService.CreateInvoiceAsync(companyId);
 
-            return File(invoicePdf, "application/pdf", "invoice.pdf");
+            return File(invoice, "application/pdf", "invoice.pdf");
         }
 
         [HttpGet]

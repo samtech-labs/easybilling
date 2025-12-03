@@ -5,6 +5,7 @@ using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Templates;
 using Microsoft.EntityFrameworkCore;
+using Syncfusion.Licensing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 };
+
+var syncfusionKey = builder.Configuration["Syncfusion:LicenseKey"];
+SyncfusionLicenseProvider.RegisterLicense(syncfusionKey);
 
 app.UseHttpsRedirection();
 

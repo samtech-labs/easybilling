@@ -1,5 +1,4 @@
 ﻿
-
 namespace EasyBilling.Application.IServices
 {
     public interface IInvoiceService
