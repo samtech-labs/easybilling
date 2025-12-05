@@ -1,6 +1,4 @@
-﻿
-
-namespace EasyBilling.Application.Dtos
+﻿namespace EasyBilling.Application.Dtos
 {
     public class InvoiceLineDto
     {
