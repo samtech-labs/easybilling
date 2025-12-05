@@ -10,6 +10,7 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<Company> Companies { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Client> Clients { get; set; }
+        public DbSet<Invoice> Invoices { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -26,6 +27,13 @@ namespace EasyBilling.Infrastructure.Persistence
                 .HasMany(c => c.Clients)
                 .WithOne(cl => cl.Company)
                 .HasForeignKey(cl => cl.CompanyId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Invoice>()
+                .HasMany(i => i.InvoiceLines)
+                .WithOne(il => il.Invoice)
+                .HasForeignKey(il => il.InvoiceId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
 

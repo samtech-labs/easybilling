@@ -17,8 +17,4 @@
     <ProjectReference Include="..\EasyBilling.Domain\EasyBilling.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Repositories\" />
-  </ItemGroup>
-
 </Project>
