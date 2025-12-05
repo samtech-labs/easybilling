@@ -15,6 +15,30 @@ namespace EasyBilling.Infrastructure.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Company>().HasData(
+                new Company
+                {
+                    Id = Guid.Parse("e11e24c2-8c61-4adb-af89-9464ac44964a"),
+                    Name = "SAMTECH LABS SRL",
+                    CUI = "RO49311115",
+                    RegNumber = "J18/1171/2023",
+                    Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
+                    IBAN = "RO49AAAA1B31007593840000",
+                    Bank = "Revolut Bank UAD"
+                },
+                new Company
+                {
+                    Id = Guid.Parse("40019908-3df7-4764-bbb7-1776e8e23245"),
+                    Name = "Demo Client SRL",
+                    CUI = "RO87654321",
+                    RegNumber = "J12/567/2020",
+                    Address = "Str. Testului 2, Cluj-Napoca, Romania",
+                    IBAN = "RO49BBBB1B31007593840000",
+                    Bank = "Banca Transilvania"
+                }
+            );
+
             modelBuilder.Entity<User>().HasData(
                 new User
                 {
@@ -31,31 +55,6 @@ namespace EasyBilling.Infrastructure.Persistence
                     Email = "user@gmail.com",
                     Client_Id = Guid.Parse("c2a4f8b1-6e5d-4f17-91bb-0f92b74f4404"),
                     Client_Secret = "user123"
-                }
-            );
-
-            modelBuilder.Entity<Client>().HasData(
-                new Client
-                {
-                    Id = Guid.Parse("a3f5d9b2-1e34-4d5c-92a4-1d9c4c7b0151"),
-                    Name = "SC Spectacol SRL",
-                    Address = "Targu-Jiu, str. Spectaculosilor 14",
-                    Company_Id = Guid.Parse("c13dbb54-9fc5-4c72-92df-c47e6dfcce21"),
-                    Bank = "BCR",
-                    CUI = "RO12345678",
-                    IBAN = "RO49BCRL00001012345678",
-                    RegNumber = "J40/1234/2010"
-                },
-                new Client
-                {
-                    Id = Guid.Parse("b7c89fa1-6bd2-4c26-a7ea-3b2cdb0f9e62"),
-                    Name = "Pandurii Tismana",
-                    Address = "Tismana",
-                    Company_Id = Guid.Parse("de45bb29-fb3f-4c53-b9a0-87d13a6cc920"),
-                    Bank = "BT",
-                    CUI = "RO27833491",
-                    IBAN = "RO27BTRL0000123456789012",
-                    RegNumber = "J12/567/2015"
                 }
             );
         }

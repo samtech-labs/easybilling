@@ -1,4 +1,8 @@
+using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.IServices;
+using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
+using EasyBilling.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +12,9 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
 builder.Services.AddOpenApi();
 
