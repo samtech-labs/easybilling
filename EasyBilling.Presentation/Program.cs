@@ -3,9 +3,7 @@ using EasyBilling.Application.IServices;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
-using EasyBilling.Infrastructure.Templates;
 using Microsoft.EntityFrameworkCore;
-using Syncfusion.Licensing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +15,6 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IInvoiceTemplateRender, InvoiceTemplateRender>();
 
 builder.Services.AddOpenApi();
 
@@ -38,9 +35,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 };
-
-var syncfusionKey = builder.Configuration["Syncfusion:LicenseKey"];
-SyncfusionLicenseProvider.RegisterLicense(syncfusionKey);
 
 app.UseHttpsRedirection();
 
