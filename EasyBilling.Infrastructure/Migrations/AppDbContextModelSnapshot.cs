@@ -29,22 +29,19 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Address")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Bank")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("CUI")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("Company_Id")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("IBAN")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
@@ -52,10 +49,11 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("RegNumber")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
 
                     b.ToTable("Clients");
                 });
@@ -67,11 +65,9 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Address")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Bank")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("CUI")
@@ -79,7 +75,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("IBAN")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
@@ -87,10 +82,14 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("RegNumber")
-                        .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Companies");
 
@@ -103,7 +102,8 @@ namespace EasyBilling.Infrastructure.Migrations
                             CUI = "RO49311115",
                             IBAN = "RO49AAAA1B31007593840000",
                             Name = "SAMTECH LABS SRL",
-                            RegNumber = "J18/1171/2023"
+                            RegNumber = "J18/1171/2023",
+                            UserId = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101")
                         },
                         new
                         {
@@ -113,7 +113,8 @@ namespace EasyBilling.Infrastructure.Migrations
                             CUI = "RO87654321",
                             IBAN = "RO49BBBB1B31007593840000",
                             Name = "Demo Client SRL",
-                            RegNumber = "J12/567/2020"
+                            RegNumber = "J12/567/2020",
+                            UserId = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
                         });
                 });
 
@@ -123,14 +124,11 @@ namespace EasyBilling.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("Client_Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Client_Secret")
+                    b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Email")
+                    b.Property<string>("Password")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -146,19 +144,49 @@ namespace EasyBilling.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
-                            Client_Id = new Guid("e8c9d14f-3df0-4ab5-9a72-6c1f4bb3a202"),
-                            Client_Secret = "admin123",
                             Email = "admin@gmail.com",
+                            Password = "admin123",
                             Username = "admin"
                         },
                         new
                         {
                             Id = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
-                            Client_Id = new Guid("c2a4f8b1-6e5d-4f17-91bb-0f92b74f4404"),
-                            Client_Secret = "user123",
                             Email = "user@gmail.com",
+                            Password = "user123",
                             Username = "user"
                         });
+                });
+
+            modelBuilder.Entity("EasyBilling.Domain.Models.Client", b =>
+                {
+                    b.HasOne("EasyBilling.Domain.Models.Company", "Company")
+                        .WithMany("Clients")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
+                {
+                    b.HasOne("EasyBilling.Domain.Models.User", "User")
+                        .WithMany("Companies")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
+                {
+                    b.Navigation("Clients");
+                });
+
+            modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
+                {
+                    b.Navigation("Companies");
                 });
 #pragma warning restore 612, 618
         }

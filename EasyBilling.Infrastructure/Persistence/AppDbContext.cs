@@ -1,7 +1,6 @@
 ﻿using EasyBilling.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
-
 namespace EasyBilling.Infrastructure.Persistence
 {
     public class AppDbContext : DbContext
@@ -16,6 +15,37 @@ namespace EasyBilling.Infrastructure.Persistence
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.Companies)
+                .WithOne(c => c.User)
+                .HasForeignKey(c => c.UserId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Company>()
+                .HasMany(c => c.Clients)
+                .WithOne(cl => cl.Company)
+                .HasForeignKey(cl => cl.CompanyId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<User>().HasData(
+                new User
+                {
+                    Id = Guid.Parse("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
+                    Username = "admin",
+                    Password = "admin123",
+                    Email = "admin@gmail.com"
+                },
+                new User
+                {
+                    Id = Guid.Parse("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
+                    Username = "user",
+                    Password = "user123",
+                    Email = "user@gmail.com"
+                }
+            );
+
             modelBuilder.Entity<Company>().HasData(
                 new Company
                 {
@@ -25,7 +55,8 @@ namespace EasyBilling.Infrastructure.Persistence
                     RegNumber = "J18/1171/2023",
                     Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
                     IBAN = "RO49AAAA1B31007593840000",
-                    Bank = "Revolut Bank UAD"
+                    Bank = "Revolut Bank UAD",
+                    UserId = Guid.Parse("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101")
                 },
                 new Company
                 {
@@ -35,26 +66,8 @@ namespace EasyBilling.Infrastructure.Persistence
                     RegNumber = "J12/567/2020",
                     Address = "Str. Testului 2, Cluj-Napoca, Romania",
                     IBAN = "RO49BBBB1B31007593840000",
-                    Bank = "Banca Transilvania"
-                }
-            );
-
-            modelBuilder.Entity<User>().HasData(
-                new User
-                {
-                    Id = Guid.Parse("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
-                    Username = "admin",
-                    Email = "admin@gmail.com",
-                    Client_Id = Guid.Parse("e8c9d14f-3df0-4ab5-9a72-6c1f4bb3a202"),
-                    Client_Secret = "admin123"
-                },
-                new User
-                {
-                    Id = Guid.Parse("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
-                    Username = "user",
-                    Email = "user@gmail.com",
-                    Client_Id = Guid.Parse("c2a4f8b1-6e5d-4f17-91bb-0f92b74f4404"),
-                    Client_Secret = "user123"
+                    Bank = "Banca Transilvania",
+                    UserId = Guid.Parse("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
                 }
             );
         }
