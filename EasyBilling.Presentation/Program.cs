@@ -41,6 +41,18 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
@@ -91,15 +103,16 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-}
-
-if (app.Environment.IsDevelopment())
-{
     app.UseSwagger();
     app.UseSwaggerUI();
-};
+}
+else
+{
+    app.UseHttpsRedirection();
+}
 
-app.UseHttpsRedirection();
+// Use CORS before authentication and authorization
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
