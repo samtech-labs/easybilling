@@ -154,6 +154,8 @@ namespace EasyBilling.Application.Services
                 });
             }).GeneratePdf();
 
+            // #TODO: Save the pdf to cloud storage and save the link in the database
+
             return pdfBytes;
         }
     }
