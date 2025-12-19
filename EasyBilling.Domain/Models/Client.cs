@@ -6,6 +6,7 @@ public class Client
     public Guid CompanyId { get; set; }
     public required string Name  { get; set; }
     public string? Address  { get; set; }
+    public string? County  { get; set; }
     public required string CUI  { get; set; }
     public string? RegNumber  { get; set; }
     public string? IBAN {get; set; }

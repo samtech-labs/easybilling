@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251205153019_InvoiceTables")]
+    partial class InvoiceTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -40,9 +43,6 @@ namespace EasyBilling.Infrastructure.Migrations
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("County")
-                        .HasColumnType("text");
 
                     b.Property<string>("IBAN")
                         .HasColumnType("text");
@@ -75,9 +75,6 @@ namespace EasyBilling.Infrastructure.Migrations
 
                     b.Property<string>("CUI")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("County")
                         .HasColumnType("text");
 
                     b.Property<string>("IBAN")
@@ -122,76 +119,6 @@ namespace EasyBilling.Infrastructure.Migrations
                             RegNumber = "J12/567/2020",
                             UserId = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
                         });
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClientId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Series")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("Vat")
-                        .HasColumnType("numeric");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("Invoices");
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("VatRate")
-                        .HasColumnType("numeric");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.ToTable("InvoiceLine");
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
@@ -255,44 +182,9 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.Client", "Client")
-                        .WithMany()
-                        .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EasyBilling.Domain.Models.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Client");
-
-                    b.Navigation("Company");
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.Invoice", "Invoice")
-                        .WithMany("InvoiceLines")
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Invoice");
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
                 {
                     b.Navigation("Clients");
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
-                {
-                    b.Navigation("InvoiceLines");
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>

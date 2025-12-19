@@ -7,7 +7,7 @@ namespace EasyBilling.Infrastructure.Repositories
 {
     public class CompanyRepository(AppDbContext db): ICompanyRepository
     {
-        public readonly AppDbContext _db = db;
+        private readonly AppDbContext _db = db;
 
         public async Task<Company?> GetByIdAsync(Guid companyId)
         {
