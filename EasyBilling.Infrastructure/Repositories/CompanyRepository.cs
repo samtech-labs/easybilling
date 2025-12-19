@@ -18,5 +18,12 @@ namespace EasyBilling.Infrastructure.Repositories
         {
             return await _db.Companies.ToListAsync();
         }
+
+        public async Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId)
+        {
+            return await _db.Companies
+                .Where(c => c.UserId == userId)
+                .ToListAsync();
+        }
     }
 }

@@ -1,41 +1,37 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using EasyBilling.Application.IServices;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EasyBilling.Presentation.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CompanyController : ControllerBase
     {
-        // GET: api/<CompanyController>
+        private readonly ICompanyService _companyService;
+
+        public CompanyController(ICompanyService companyService)
+        {
+            _companyService = companyService;
+        }
+
         [HttpGet]
-        public IEnumerable<string> Get()
+        [Route("GetAllCompanies")]
+        public async Task<IActionResult> GetCompanies()
         {
-            return new string[] { "value1", "value2" };
-        }
+            var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirst(ClaimTypes.NameIdentifier);
 
-        // GET api/<CompanyController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
-        }
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized();
+            }
 
-        // POST api/<CompanyController>
-        [HttpPost]
-        public void Post([FromBody] string value)
-        {
-        }
-
-        // PUT api/<CompanyController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
-        {
-        }
-
-        // DELETE api/<CompanyController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
+            var companies = await _companyService.GetCompaniesByUserAsync(userId);
+            return Ok(companies);
         }
     }
 }
