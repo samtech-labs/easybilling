@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.Application", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.Presentation", "EasyBilling.Presentation\EasyBilling.Presentation.csproj", "{8ED55A77-1430-4A76-9676-1909B16785DC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyBilling.ANAFIntegration", "EasyBilling.ANAFIntegration\EasyBilling.ANAFIntegration.csproj", "{105E0BC3-CED9-F845-353E-650756D7506D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,14 @@ Global
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Release|x86.ActiveCfg = Release|x86
 		{8ED55A77-1430-4A76-9676-1909B16785DC}.Release|x86.Build.0 = Release|x86
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Debug|x86.Build.0 = Debug|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Release|x86.ActiveCfg = Release|Any CPU
+		{105E0BC3-CED9-F845-353E-650756D7506D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
