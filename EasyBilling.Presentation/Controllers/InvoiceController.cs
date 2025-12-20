@@ -14,11 +14,11 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpPost]
         [Route("CreateInvoice")]
-        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, Guid companyId)
+        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request)
         {
             try
             {
-                var invoice = await _invoiceService.CreateInvoiceAsync(request, companyId);
+                var invoice = await _invoiceService.CreateInvoiceAsync(request);
                 return Ok(invoice);
             }
             catch (InvalidOperationException ex)

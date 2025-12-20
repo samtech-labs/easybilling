@@ -19,8 +19,10 @@ namespace EasyBilling.Application.Services
 
         private const int MaxInvoiceLines = 5;
 
-        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request, Guid companyId)
+        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request)
         {
+            var companyId = request.CompanyId;
+
             // Validate company exists
             var company = await _companyService.GetCompanyByIdAsync(companyId);
             if (company == null)
@@ -43,6 +45,9 @@ namespace EasyBilling.Application.Services
             ClientResponseDto clientDto;
             Guid clientId;
 
+            // Determine client CUI from either ClientCui or ClientDetails
+            var clientCui = request.ClientCui ?? request.ClientDetails?.Cui;
+
             if (request.ClientId.HasValue)
             {
                 // Client exists in database
@@ -55,10 +60,10 @@ namespace EasyBilling.Application.Services
                 clientId = existingClient.Id;
                 clientDto = MapClientToDto(existingClient);
             }
-            else if (!string.IsNullOrWhiteSpace(request.ClientCui))
+            else if (!string.IsNullOrWhiteSpace(clientCui))
             {
                 // Try to find client by CUI in database first
-                var cleanCui = request.ClientCui.Replace("RO", "").Replace(" ", "").Trim();
+                var cleanCui = clientCui.Replace("RO", "").Replace(" ", "").Trim();
                 var existingClient = await _clientRepository.GetByCuiAndCompanyIdAsync(cleanCui, companyId);
 
                 if (existingClient != null)
@@ -95,42 +100,59 @@ namespace EasyBilling.Application.Services
             }
             else
             {
-                throw new InvalidOperationException("Either ClientId or ClientCui must be provided.");
+                throw new InvalidOperationException("Either ClientId, ClientCui, or ClientDetails with CUI must be provided.");
             }
 
-            // Calculate totals
+            // Calculate totals (use Vat if VatRate is 0, for frontend compatibility)
             decimal totalAmount = 0;
             decimal totalVat = 0;
 
             foreach (var line in request.InvoiceLines)
             {
+                var vatRate = line.VatRate > 0 ? line.VatRate : (line.Vat ?? 0);
                 var lineTotal = line.Quantity * line.UnitPrice;
-                var lineVat = lineTotal * line.VatRate / 100;
+                var lineVat = lineTotal * vatRate / 100;
                 totalAmount += lineTotal;
                 totalVat += lineVat;
             }
 
             // Create invoice
             var invoiceId = Guid.NewGuid();
+            var invoiceDate = request.Date ?? request.IssueDate ?? DateTime.UtcNow;
+
+            // Ensure DateTime is UTC for PostgreSQL compatibility
+            if (invoiceDate.Kind == DateTimeKind.Unspecified)
+            {
+                invoiceDate = DateTime.SpecifyKind(invoiceDate, DateTimeKind.Utc);
+            }
+            else if (invoiceDate.Kind == DateTimeKind.Local)
+            {
+                invoiceDate = invoiceDate.ToUniversalTime();
+            }
+
             var invoice = new Invoice
             {
                 Id = invoiceId,
-                Date = request.Date ?? DateTime.UtcNow,
-                Series = request.Series,
-                Number = request.Number,
+                Date = invoiceDate,
+                Series = request.Series ?? "INV",
+                Number = request.Number ?? 1,
                 TotalAmount = totalAmount,
                 Vat = totalVat,
                 CompanyId = companyId,
                 ClientId = clientId,
-                InvoiceLines = request.InvoiceLines.Select(line => new InvoiceLine
+                InvoiceLines = request.InvoiceLines.Select(line =>
                 {
-                    Id = Guid.NewGuid(),
-                    InvoiceId = invoiceId,
-                    Description = line.Description,
-                    Quantity = line.Quantity,
-                    UnitPrice = line.UnitPrice,
-                    VatRate = line.VatRate,
-                    Unit = line.Unit
+                    var vatRate = line.VatRate > 0 ? line.VatRate : (line.Vat ?? 0);
+                    return new InvoiceLine
+                    {
+                        Id = Guid.NewGuid(),
+                        InvoiceId = invoiceId,
+                        Description = line.Description,
+                        Quantity = line.Quantity,
+                        UnitPrice = line.UnitPrice,
+                        VatRate = vatRate,
+                        Unit = line.Unit ?? "buc"
+                    };
                 }).ToList()
             };
 
@@ -224,6 +246,10 @@ namespace EasyBilling.Application.Services
                             .FontColor(Colors.Blue.Medium);
 
                         decimal grandTotal = 0;
+                        // Get VAT rate from invoice lines (show if all lines have the same rate)
+                        var vatRates = invoice.InvoiceLines?.Select(l => l.VatRate).Distinct().ToList() ?? new List<decimal>();
+                        var vatRateDisplay = vatRates.Count == 1 ? $"{vatRates[0]}%" : "Diverse";
+
                         col.Item().Row(row =>
                         {
                             row.RelativeItem().Text(text =>
@@ -239,8 +265,7 @@ namespace EasyBilling.Application.Services
                             row.RelativeItem().AlignRight().Text(text =>
                             {
                                 text.Span("Cota TVA ");
-                                text.Span(invoice.Vat.ToString());
-                                text.Span("%");
+                                text.Span(vatRateDisplay);
                             });
                         });
 
