@@ -1,5 +1,4 @@
 using EasyBilling.Application.Interfaces;
-using EasyBilling.Application.IServices;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
@@ -54,6 +53,9 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
