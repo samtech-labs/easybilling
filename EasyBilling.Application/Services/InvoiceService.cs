@@ -6,9 +6,10 @@ using QuestPDF.Infrastructure;
 
 namespace EasyBilling.Application.Services
 {
-    public class InvoiceService(IInvoiceRepository invoiceRepository) : IInvoiceService
+    public class InvoiceService(IInvoiceRepository invoiceRepository, IBlobStorageService blobStorageService) : IInvoiceService
     {
         public readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
+        private readonly IBlobStorageService _blobStorageService = blobStorageService;
         public async Task<byte[]> CreateInvoiceAsync(Guid invoiceId)
         {
             var invoice = await _invoiceRepository.GetByIdAsync(invoiceId) ?? throw new Exception("Invoice not found.");
@@ -154,7 +155,7 @@ namespace EasyBilling.Application.Services
                 });
             }).GeneratePdf();
 
-            // #TODO: Save the pdf to cloud storage and save the link in the database
+            await _blobStorageService.UploadFileToBlob(invoiceId, pdfBytes);
 
             return pdfBytes;
         }

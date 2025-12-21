@@ -1,4 +1,5 @@
 using EasyBilling.Application.Interfaces;
+using Azure.Storage.Blobs;
 using EasyBilling.Application.IServices;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
@@ -55,6 +56,14 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
+//Add Blob Client
+builder.Services.AddSingleton(_ =>
+{
+    var cs = builder.Configuration["AzureBlob:ConnectionString"];
+    return new BlobServiceClient(cs);
+});
+
+builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();

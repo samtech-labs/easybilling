@@ -18,9 +18,9 @@ namespace EasyBilling.Presentation.Controllers
 
         // TODO this also should include requests json body with invoice details
         [HttpPost("pdf")]
-        public async Task<IActionResult> CreateInvoice(Guid companyId)
+        public async Task<IActionResult> CreateInvoice(Guid invoiceId)
         {
-            var invoice = await _invoiceService.CreateInvoiceAsync(companyId);
+            var invoice = await _invoiceService.CreateInvoiceAsync(invoiceId);
 
             return File(invoice, "application/pdf", "invoice.pdf");
         }
