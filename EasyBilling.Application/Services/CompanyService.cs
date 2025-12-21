@@ -5,10 +5,10 @@ using EasyBilling.Application.Dtos;
 
 namespace EasyBilling.Application.Services
 {
-    public class CompanyService(ICompanyRepository companyRepository, ICurrentUserService currentUserService) : ICompanyService
+    public class CompanyService(ICompanyRepository companyRepository, UserContext userContext) : ICompanyService
     {
         private readonly ICompanyRepository _companyRepository = companyRepository;
-        private readonly ICurrentUserService _currentUserService = currentUserService;
+        private readonly UserContext _userContext = userContext;
 
         public async Task<List<Company>> GetCompaniesByUserAsync(Guid userId)
         {
@@ -39,23 +39,20 @@ namespace EasyBilling.Application.Services
 
         public async Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest)
         {
-            if (_currentUserService.UserId == Guid.Empty)
+            if (_userContext.UserId == Guid.Empty)
             {
                 throw new UnauthorizedAccessException("User is not authenticated.");
             }
 
             var cleanCui = createCompanyRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
 
-            var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _currentUserService.UserId);
+            var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _userContext.UserId);
             if (existingCompany != null)
             {
                 throw new InvalidOperationException($"A company with CUI '{createCompanyRequest.CUI}' already exists.");
             }
 
             var anafDetails = await ANAFIntegration.ANAFIntegration.GetCompanyDetails(cleanCui, DateTime.Today);
-
-            // We need to establish if we prefer ANAF data over user-provided data.
-            // For the moment, we will prioritize ANAF data when available, but still allow user overrides for certain fields.
 
             var company = new Company
             {
@@ -67,7 +64,7 @@ namespace EasyBilling.Application.Services
                 RegNumber = anafDetails?.RegistrationNumber ?? createCompanyRequest.RegNumber,
                 IBAN = createCompanyRequest.IBAN,
                 Bank = createCompanyRequest.Bank,
-                UserId = _currentUserService.UserId
+                UserId = _userContext.UserId
             };
 
             await _companyRepository.AddAsync(company);

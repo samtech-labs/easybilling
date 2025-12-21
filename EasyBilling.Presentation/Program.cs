@@ -1,5 +1,7 @@
 using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Services;
+using EasyBilling.Domain.Models;
+using EasyBilling.Infrastructure.Middleware;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Services;
@@ -55,13 +57,13 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<UserContext>();
 
 builder.Services.AddOpenApi();
 
@@ -118,6 +120,7 @@ else
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
+app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
