@@ -110,13 +110,12 @@ jobs:
         run: |
           "ASPNETCORE_ENVIRONMENT=Production" | Out-File -FilePath $env:GITHUB_ENV -Append
           "DOTNET_ENVIRONMENT=Production" | Out-File -FilePath $env:GITHUB_ENV -Append
-
           "ConnectionStrings__DefaultConnection=$env:POSTGRES_CONNECTION_STRING" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Run EF Core migrations (bundle)
         shell: pwsh
         run: |
-          & ".\migrate\migrate.exe"
+          & ".\migrate\migrate.exe" --connection "$env:POSTGRES_CONNECTION_STRING"
 
       - name: Remove Postgres firewall rule (Flexible Server)
         shell: pwsh
