@@ -36,5 +36,11 @@ namespace EasyBilling.Infrastructure.Repositories
             await _db.Companies.AddAsync(company);
             await _db.SaveChangesAsync();
         }
+
+        public async Task DeleteAsync(Company company)
+        {
+            _db.Companies.Remove(company);
+            await _db.SaveChangesAsync();
+        }
     }
 }
