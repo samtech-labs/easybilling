@@ -1,0 +1,92 @@
+name: Deploy to Azure App Service
+
+# =============================================================================
+# REQUIRED GITHUB SECRETS:
+# =============================================================================
+# 1. AZURE_WEBAPP_PUBLISH_PROFILE - Download from Azure Portal:
+#    Azure Portal > App Service > Deployment Center > Manage publish profile
+#
+# =============================================================================
+# REQUIRED AZURE APP SERVICE CONFIGURATION (Application Settings):
+# =============================================================================
+# These should be set in Azure Portal > App Service > Configuration > Application settings:
+#
+# ConnectionStrings__DefaultConnection:
+#   "Host=<your-postgres-server>.postgres.database.azure.com;Port=5432;Database=easybilling;Username=<username>;Password=<password>;SSL Mode=Require;"
+#
+# JwtSettings__Key:
+#   "<generate a new 256-bit secret key for production>"
+#
+# JwtSettings__Issuer: "EasyBilling"
+# JwtSettings__Audience: "EasyBillingClients"
+# JwtSettings__ExpiresMinutes: "60"
+#
+# ASPNETCORE_ENVIRONMENT: "Production"
+# =============================================================================
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  AZURE_WEBAPP_NAME: 'easybilling-api'  # Set this to your Azure Web App name
+  AZURE_WEBAPP_PACKAGE_PATH: './publish'
+  PROJECT_PATH: 'EasyBilling.Presentation/EasyBilling.Presentation.csproj'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test --configuration Release --no-build --verbosity normal
+        continue-on-error: false
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp
+          path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
