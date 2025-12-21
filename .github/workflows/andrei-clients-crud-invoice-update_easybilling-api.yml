@@ -3,7 +3,7 @@ name: Build and deploy ASP.Net Core app to Azure Web App - easybilling-api
 on:
   push:
     branches:
-      - andrei/clients-crud-invoice-update
+      - deploy
   workflow_dispatch:
 
 jobs:
