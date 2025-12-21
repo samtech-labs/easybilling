@@ -83,24 +83,12 @@ jobs:
           "ip=$ip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Allow runner IP in Postgres firewall (Flexible Server)
-        if: ${{ vars.PG_MODE == 'flexible' }}
         shell: pwsh
         run: |
           az postgres flexible-server firewall-rule create `
             --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
             --name "${{ vars.PG_SERVER_NAME }}" `
             --rule-name "gh-${{ github.run_id }}" `
-            --start-ip-address "${{ steps.ip.outputs.ip }}" `
-            --end-ip-address "${{ steps.ip.outputs.ip }}"
-
-      - name: Allow runner IP in Postgres firewall (Single Server)
-        if: ${{ vars.PG_MODE == 'single' }}
-        shell: pwsh
-        run: |
-          az postgres server firewall-rule create `
-            --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
-            --server-name "${{ vars.PG_SERVER_NAME }}" `
-            --name "gh-${{ github.run_id }}" `
             --start-ip-address "${{ steps.ip.outputs.ip }}" `
             --end-ip-address "${{ steps.ip.outputs.ip }}"
 
