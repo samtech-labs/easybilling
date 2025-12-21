@@ -7,24 +7,14 @@ namespace EasyBilling.Infrastructure.Persistence
     {
         public AppDbContext CreateDbContext(string[] args)
         {
-            var connectionString = GetArg(args, "--connection") ?? 
-                Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING") ?? 
-                throw new InvalidOperationException("Missing connection string. Pass --connection or set POSTGRES_CONNECTION_STRING.");
-            
-            var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(connectionString)
-                .Options;
+            var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
-            return new AppDbContext(optionsBuilder);
-        }
+            // Dummy connection string for design-time operations (migrations bundle creation).
+            // EF Core only needs to understand the model schema - it doesn't connect to the DB.
+            // At runtime, the actual connection string is passed via --connection argument.
+            optionsBuilder.UseNpgsql("Host=localhost;Database=easybilling-dev");
 
-        private static string? GetArg(string[] args, string name)
-        {
-            for (var i = 0; i < args.Length - 1; i++)
-                if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
-                    return args[i + 1];
-
-            return null;
+            return new AppDbContext(optionsBuilder.Options);
         }
     }
 }
