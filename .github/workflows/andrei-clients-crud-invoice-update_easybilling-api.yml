@@ -111,23 +111,12 @@ jobs:
           & ".\migrate\migrate.exe" --connection "$env:POSTGRES_CONNECTION_STRING"
 
       - name: Remove Postgres firewall rule (Flexible Server)
-        if: ${{ always() && vars.PG_MODE == 'flexible' }}
         shell: pwsh
         run: |
           az postgres flexible-server firewall-rule delete `
             --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
             --name "${{ vars.PG_SERVER_NAME }}" `
             --rule-name "gh-${{ github.run_id }}" `
-            -y
-
-      - name: Remove Postgres firewall rule (Single Server)
-        if: ${{ always() && vars.PG_MODE == 'single' }}
-        shell: pwsh
-        run: |
-          az postgres server firewall-rule delete `
-            --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
-            --server-name "${{ vars.PG_SERVER_NAME }}" `
-            --name "gh-${{ github.run_id }}" `
             -y
 
       - name: Deploy to Azure Web App
