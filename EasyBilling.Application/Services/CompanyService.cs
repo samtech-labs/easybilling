@@ -10,6 +10,8 @@ namespace EasyBilling.Application.Services
         private readonly ICompanyRepository _companyRepository = companyRepository;
         private readonly ICurrentUserService _currentUserService = currentUserService;
 
+        private const int MaxCompaniesPerUser = 3;
+
         public async Task<List<Company>> GetCompaniesByUserAsync(Guid userId)
         {
             return await _companyRepository.GetAllCompaniesByUserAsync(userId);
@@ -44,6 +46,13 @@ namespace EasyBilling.Application.Services
                 throw new UnauthorizedAccessException("User is not authenticated.");
             }
 
+            // Check company limit per user
+            var userCompanies = await _companyRepository.GetAllCompaniesByUserAsync(_currentUserService.UserId);
+            if (userCompanies.Count >= MaxCompaniesPerUser)
+            {
+                throw new InvalidOperationException($"You have reached the maximum limit of {MaxCompaniesPerUser} companies.");
+            }
+
             var cleanCui = createCompanyRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
 
             var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _currentUserService.UserId);
@@ -72,6 +81,28 @@ namespace EasyBilling.Application.Services
 
             await _companyRepository.AddAsync(company);
             return company;
+        }
+
+        public async Task<Company?> GetCompanyByIdAsync(Guid companyId)
+        {
+            return await _companyRepository.GetByIdAsync(companyId);
+        }
+
+        public async Task DeleteCompanyAsync(Guid companyId)
+        {
+            var company = await _companyRepository.GetByIdAsync(companyId);
+
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            if (company.UserId != _currentUserService.UserId)
+            {
+                throw new InvalidOperationException("Company does not belong to the current user.");
+            }
+
+            await _companyRepository.DeleteAsync(company);
         }
     }
 }

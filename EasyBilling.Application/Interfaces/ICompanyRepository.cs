@@ -9,5 +9,6 @@ namespace EasyBilling.Application.Interfaces
         Task<List<Company>> GetAllCompaniesAsync();
         Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId);
         Task AddAsync(Company company);
+        Task DeleteAsync(Company company);
     }
 }
