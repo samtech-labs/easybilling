@@ -3,13 +3,14 @@ using EasyBilling.Application.IServices;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Azure.Storage.Blobs;
 
 namespace EasyBilling.Application.Services
 {
-    public class InvoiceService(IInvoiceRepository invoiceRepository, IBlobStorageService blobStorageService) : IInvoiceService
+    public class InvoiceService(IInvoiceRepository invoiceRepository, BlobStorageService blobStorageService) : IInvoiceService
     {
         public readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
-        private readonly IBlobStorageService _blobStorageService = blobStorageService;
+        private readonly BlobStorageService _blobStorageService = blobStorageService;
         public async Task<byte[]> CreateInvoiceAsync(Guid invoiceId)
         {
             var invoice = await _invoiceRepository.GetByIdAsync(invoiceId) ?? throw new Exception("Invoice not found.");
@@ -155,7 +156,16 @@ namespace EasyBilling.Application.Services
                 });
             }).GeneratePdf();
 
-            await _blobStorageService.UploadFileToBlob(invoiceId, pdfBytes);
+            try
+            {
+                await _blobStorageService.UploadFileToBlob(invoiceId, pdfBytes);
+            }
+            catch (Azure.RequestFailedException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Blob upload failed (Status: {ex.Status}, Code: {ex.ErrorCode})",
+                    ex);
+            }
 
             return pdfBytes;
         }

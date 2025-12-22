@@ -63,7 +63,7 @@ builder.Services.AddSingleton(_ =>
     return new BlobServiceClient(cs);
 });
 
-builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
+builder.Services.AddScoped<BlobStorageService>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
