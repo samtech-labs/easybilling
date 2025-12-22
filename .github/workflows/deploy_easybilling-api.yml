@@ -1,0 +1,135 @@
+name: Build and deploy ASP.Net Core app to Azure Web App - easybilling-api
+
+on:
+  push:
+    branches:
+      - deploy
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
+
+      - name: Restore dotnet tools
+        run: dotnet tool restore
+
+      - name: Create EF migrations bundle
+        run: >
+          dotnet ef migrations bundle
+          --project EasyBilling.Infrastructure/EasyBilling.Infrastructure.csproj
+          --startup-project EasyBilling.Presentation/EasyBilling.Presentation.csproj
+          --output "${{env.DOTNET_ROOT}}/migrate/migrate.exe"
+
+      - name: dotnet publish
+        run: dotnet publish EasyBilling.Presentation/EasyBilling.Presentation.csproj -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+      - name: Upload migrations bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ef-migrate
+          path: ${{env.DOTNET_ROOT}}/migrate/migrate.exe
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download app artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+          path: app
+
+      - name: Download migrations bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ef-migrate
+          path: migrate
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8C98C36AE28E42B8A7ED3475233393A6 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B413C9A42C334CB49831424D0BD9CEFC }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FBC7349EA20B49CC9DBC1DC5DE388ABC }}
+
+      - name: Get runner public IP
+        id: ip
+        shell: pwsh
+        run: |
+          $ip = (Invoke-RestMethod -Uri "https://api.ipify.org").ToString()
+          "ip=$ip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Allow runner IP in Postgres firewall (Flexible Server)
+        shell: pwsh
+        run: |
+          az postgres flexible-server firewall-rule create `
+            --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
+            --name "${{ vars.PG_SERVER_NAME }}" `
+            --rule-name "gh-${{ github.run_id }}" `
+            --start-ip-address "${{ steps.ip.outputs.ip }}" `
+            --end-ip-address "${{ steps.ip.outputs.ip }}"
+
+      - name: Get connection string from Web App
+        shell: pwsh
+        run: |
+          $conn = az webapp config connection-string list `
+            -g "${{ vars.AZURE_RG }}" `
+            -n "${{ vars.AZURE_WEBAPP_NAME }}" `
+            --query "[?name=='AZURE_POSTGRESQL_CONNECTIONSTRING'].value | [0]" `
+            -o tsv
+
+          if (-not $conn) { throw "AZURE_POSTGRESQL_CONNECTIONSTRING not found on Web App." }
+
+          "POSTGRES_CONNECTION_STRING=$conn" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Set environment variables for migrations
+        shell: pwsh
+        run: |
+          "ASPNETCORE_ENVIRONMENT=Production" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "DOTNET_ENVIRONMENT=Production" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ConnectionStrings__DefaultConnection=$env:POSTGRES_CONNECTION_STRING" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Run EF Core migrations (bundle)
+        shell: pwsh
+        run: |
+          & ".\migrate\migrate.exe" --connection "$env:POSTGRES_CONNECTION_STRING"
+
+      - name: Remove Postgres firewall rule (Flexible Server)
+        shell: pwsh
+        run: |
+          az postgres flexible-server firewall-rule delete `
+            --resource-group "${{ vars.PG_RESOURCE_GROUP }}" `
+            --name "${{ vars.PG_SERVER_NAME }}" `
+            --rule-name "gh-${{ github.run_id }}" `
+            -y
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'easybilling-api'
+          slot-name: 'Production'
+          package: app
+          

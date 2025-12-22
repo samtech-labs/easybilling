@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EasyBilling.ANAFIntegration\EasyBilling.ANAFIntegration.csproj" />
     <ProjectReference Include="..\EasyBilling.Domain\EasyBilling.Domain.csproj" />
   </ItemGroup>
 
