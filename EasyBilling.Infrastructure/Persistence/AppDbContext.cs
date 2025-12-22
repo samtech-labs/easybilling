@@ -11,6 +11,7 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<User> Users { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<AnafToken> AnafTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,12 @@ namespace EasyBilling.Infrastructure.Persistence
                 .WithOne(c => c.User)
                 .HasForeignKey(c => c.UserId)
                 .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.AnafToken)
+                .WithOne(t => t.User)
+                .HasForeignKey<AnafToken>(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Company>()
