@@ -6,7 +6,7 @@ namespace EasyBilling.Application.Interfaces
     public interface IAnafIntegrationService
     {
         Task SaveAnafTokenAsync(AnafTokenCreateDto anafTokenCreateDto);
-        Task UpdateAnaftokenAsync(AnafToken anafToken);
+        Task UpdateAnafTokenAsync(AnafToken anafToken);
         Task<AnafToken?> GetAnafTokenByUserIdAsync(Guid userId);
     }
 }

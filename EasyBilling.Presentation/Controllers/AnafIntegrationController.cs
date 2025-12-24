@@ -115,7 +115,7 @@ namespace EasyBilling.Presentation.Controllers
                 existingToken.ExpiresAt = DateTime.UtcNow.AddSeconds(tokenData.ExpiresIn);
                 existingToken.CreatedAt = DateTime.UtcNow;
 
-                await _anafIntegrationService.UpdateAnaftokenAsync(existingToken);
+                await _anafIntegrationService.UpdateAnafTokenAsync(existingToken);
             }
             else
             {
@@ -198,7 +198,7 @@ namespace EasyBilling.Presentation.Controllers
                 existingToken.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(365);
             }
 
-            await _anafIntegrationService.UpdateAnaftokenAsync(existingToken);
+            await _anafIntegrationService.UpdateAnafTokenAsync(existingToken);
 
             return Ok(new
             {
