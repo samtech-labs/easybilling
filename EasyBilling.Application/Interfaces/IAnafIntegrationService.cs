@@ -8,5 +8,6 @@ namespace EasyBilling.Application.Interfaces
         Task SaveAnafTokenAsync(AnafTokenCreateDto anafTokenCreateDto);
         Task UpdateAnafTokenAsync(AnafToken anafToken);
         Task<AnafToken?> GetAnafTokenByUserIdAsync(Guid userId);
+        Task<bool> IsTokenExpiredAsync(Guid userId);
     }
 }

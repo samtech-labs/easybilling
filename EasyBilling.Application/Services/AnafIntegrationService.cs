@@ -33,5 +33,22 @@ namespace EasyBilling.Application.Services
         {
             return await _anafTokenRepository.GetByUserIdAsync(userId);
         }
+
+        public async Task<bool> IsTokenExpiredAsync(Guid userId)
+        {
+            var anafToken = await _anafTokenRepository.GetByUserIdAsync(userId);
+
+            if (anafToken == null)
+            {
+                return true;
+            }
+
+            if (anafToken.AccessTokenExpiresAt <= DateTime.UtcNow)
+            {
+                return true;
+            }
+
+            return false;
+        }
     }
 }
