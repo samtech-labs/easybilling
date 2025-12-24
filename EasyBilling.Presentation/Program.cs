@@ -59,6 +59,7 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
