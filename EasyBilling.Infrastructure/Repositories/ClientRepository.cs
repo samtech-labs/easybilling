@@ -2,7 +2,6 @@
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Domain.Models;
 using Microsoft.EntityFrameworkCore;
-using EasyBilling.Application.Requests;
 
 namespace EasyBilling.Infrastructure.Repositories
 {
