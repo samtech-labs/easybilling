@@ -19,12 +19,12 @@ namespace EasyBilling.Application.Services
 
         private const int MaxInvoiceLines = 5;
 
-        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request)
+        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken cancellationToken = default)
         {
             var companyId = request.CompanyId;
 
             // Validate company exists
-            var company = await _companyService.GetCompanyByIdAsync(companyId);
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
             if (company == null)
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
@@ -64,7 +64,7 @@ namespace EasyBilling.Application.Services
             {
                 // Try to find client by CUI in database first
                 var cleanCui = clientCui.Replace("RO", "").Replace(" ", "").Trim();
-                var existingClient = await _clientRepository.GetByCuiAndCompanyIdAsync(cleanCui, companyId);
+                var existingClient = await _clientRepository.GetByCuiAndCompanyIdAsync(cleanCui, companyId, cancellationToken);
 
                 if (existingClient != null)
                 {
@@ -93,7 +93,7 @@ namespace EasyBilling.Application.Services
                         RegNumber = anafDetails.RegistrationNumber
                     };
 
-                    await _clientRepository.AddAsync(newClient);
+                    await _clientRepository.AddAsync(newClient, cancellationToken);
                     clientId = newClient.Id;
                     clientDto = MapClientToDto(newClient);
                 }
@@ -156,7 +156,7 @@ namespace EasyBilling.Application.Services
                 }).ToList()
             };
 
-            await _invoiceRepository.AddAsync(invoice);
+            await _invoiceRepository.AddAsync(invoice, cancellationToken);
 
             // Build response
             return new InvoiceResponseDto
@@ -192,9 +192,9 @@ namespace EasyBilling.Application.Services
             };
         }
 
-        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId)
+        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId, CancellationToken cancellationToken = default)
         {
-            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId);
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken);
 
             if (invoice == null)
             {
@@ -209,22 +209,22 @@ namespace EasyBilling.Application.Services
             return MapInvoiceToDto(invoice);
         }
 
-        public async Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId)
+        public async Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
-            var company = await _companyService.GetCompanyByIdAsync(companyId);
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
             if (company == null)
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
             }
 
-            var invoices = await _invoiceRepository.GetAllByCompanyIdAsync(companyId);
+            var invoices = await _invoiceRepository.GetAllByCompanyIdAsync(companyId, cancellationToken);
 
             return invoices.Select(MapInvoiceToDto).ToList();
         }
 
-        public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId)
+        public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default)
         {
-            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId)
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
                 ?? throw new InvalidOperationException("Invoice not found.");
 
             QuestPDF.Settings.License = LicenseType.Community;

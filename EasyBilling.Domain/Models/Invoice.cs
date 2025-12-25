@@ -14,5 +14,6 @@
         public Client Client { get; set; } = null!;
         public Company Company { get; set; } = null!;
         public ICollection<InvoiceLine>? InvoiceLines { get; set; }
+        public ICollection<InvoiceAnafSubmission>? AnafSubmissions { get; set; }
     }
 }

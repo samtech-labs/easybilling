@@ -4,8 +4,8 @@ namespace EasyBilling.Application.Interfaces
 {
     public interface IAnafTokenRepository
     {
-        Task AddAsync(AnafToken anafToken);
-        Task UpdateAsync(AnafToken anafToken);
-        Task<AnafToken?> GetByUserIdAsync(Guid userId);
+        Task AddAsync(AnafToken anafToken, CancellationToken cancellationToken = default);
+        Task UpdateAsync(AnafToken anafToken, CancellationToken cancellationToken = default);
+        Task<AnafToken?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
     }
 }

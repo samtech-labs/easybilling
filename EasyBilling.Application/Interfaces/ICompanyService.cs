@@ -9,7 +9,7 @@ namespace EasyBilling.Application.Interfaces
         Task<List<Company>> GetCompaniesByUserAsync(Guid userId);
         Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest);
         Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui);
-        Task<Company?> GetCompanyByIdAsync(Guid companyId);
+        Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task DeleteCompanyAsync(Guid companyId);
     }
 }

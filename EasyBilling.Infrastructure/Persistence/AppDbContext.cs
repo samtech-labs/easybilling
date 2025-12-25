@@ -44,6 +44,33 @@ namespace EasyBilling.Infrastructure.Persistence
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<InvoiceAnafSubmission>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Invoice)
+                    .WithMany(i => i.AnafSubmissions)
+                    .HasForeignKey(e => e.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(e => e.UploadIndex)
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.DownloadId)
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.ErrorMessage)
+                    .HasMaxLength(2000);
+
+                entity.Property(e => e.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(20);
+
+                entity.HasIndex(e => e.InvoiceId);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => new { e.Status, e.LastCheckedAt });
+            });
+
             modelBuilder.Entity<User>().HasData(
                 new User
                 {

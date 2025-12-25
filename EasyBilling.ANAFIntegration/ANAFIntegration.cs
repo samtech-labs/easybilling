@@ -1,4 +1,4 @@
-using EasyBilling.ANAFIntegration.Models;
+using EasyBilling.ANAFIntegration.PublicGeneralAPI.Models;
 
 namespace EasyBilling.ANAFIntegration
 {

@@ -16,7 +16,6 @@ namespace EasyBilling.ANAFIntegration.EFactura
 
         // Future e-factura functions will be added here
         // Examples:
-        // - UploadInvoiceAsync
         // - GetInvoiceStatusAsync
         // - DownloadInvoiceAsync
         // - GetMessagesAsync

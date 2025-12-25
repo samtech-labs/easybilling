@@ -9,17 +9,24 @@ namespace EasyBilling.Presentation.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class InvoiceController(IInvoiceService invoiceService, IInvoiceRepository invoiceRepository, IEFacturaXmlGenerator eFacturaXmlGenerator) : ControllerBase
+    public class InvoiceController(
+        IInvoiceService invoiceService,
+        IInvoiceRepository invoiceRepository,
+        IEFacturaXmlGenerator eFacturaXmlGenerator,
+        IEFacturaService eFacturaService) : ControllerBase
     {
         private readonly IInvoiceService _invoiceService = invoiceService;
+        private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
+        private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
+        private readonly IEFacturaService _eFacturaService = eFacturaService;
 
         [HttpPost]
         [Route("CreateInvoice")]
-        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request)
+        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
         {
             try
             {
-                var invoice = await _invoiceService.CreateInvoiceAsync(request);
+                var invoice = await _invoiceService.CreateInvoiceAsync(request, cancellationToken);
                 return Ok(invoice);
             }
             catch (InvalidOperationException ex)
@@ -34,11 +41,11 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet]
         [Route("GetInvoice")]
-        public async Task<IActionResult> GetInvoice(Guid invoiceId, Guid companyId)
+        public async Task<IActionResult> GetInvoice(Guid invoiceId, Guid companyId, CancellationToken cancellationToken)
         {
             try
             {
-                var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, companyId);
+                var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, companyId, cancellationToken);
                 return Ok(invoice);
             }
             catch (InvalidOperationException ex)
@@ -53,11 +60,11 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet]
         [Route("GetAllInvoices")]
-        public async Task<IActionResult> GetAllInvoices(Guid companyId)
+        public async Task<IActionResult> GetAllInvoices(Guid companyId, CancellationToken cancellationToken)
         {
             try
             {
-                var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId);
+                var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
                 return Ok(invoices);
             }
             catch (InvalidOperationException ex)
@@ -66,17 +73,17 @@ namespace EasyBilling.Presentation.Controllers
             }
             catch (Exception)
             {
-                return StatusCode(500, "An error occurred while retrieving invoices.");
+               return StatusCode(500, "An error occurred while retrieving invoices.");
             }
         }
 
         [HttpGet]
         [Route("GeneratePdf")]
-        public async Task<IActionResult> GeneratePdf(Guid invoiceId)
+        public async Task<IActionResult> GeneratePdf(Guid invoiceId, CancellationToken cancellationToken)
         {
             try
             {
-                var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(invoiceId);
+                var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(invoiceId, cancellationToken);
                 return File(pdfBytes, "application/pdf", "invoice.pdf");
             }
             catch (InvalidOperationException ex)

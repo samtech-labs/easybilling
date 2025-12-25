@@ -1,6 +1,6 @@
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.ANAFIntegration.EFactura
+namespace EasyBilling.ANAFIntegration.EFactura.Interfaces
 {
     public interface IEFacturaXmlGenerator
     {

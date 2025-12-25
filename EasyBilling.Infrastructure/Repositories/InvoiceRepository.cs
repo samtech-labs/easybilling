@@ -9,21 +9,21 @@ namespace EasyBilling.Infrastructure.Repositories
     {
         private readonly AppDbContext _db = db;
 
-        public async Task<Invoice?> GetByIdAsync(Guid invoiceId)
+        public async Task<Invoice?> GetByIdAsync(Guid invoiceId, CancellationToken cancellationToken = default)
         {
-            return await _db.Invoices.FirstOrDefaultAsync(i => i.Id == invoiceId);
+            return await _db.Invoices.FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
         }
 
-        public async Task<Invoice?> GetByIdWithDetailsAsync(Guid invoiceId)
+        public async Task<Invoice?> GetByIdWithDetailsAsync(Guid invoiceId, CancellationToken cancellationToken = default)
         {
             return await _db.Invoices
                 .Include(i => i.Company)
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
-                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+                .FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
         }
 
-        public async Task<List<Invoice>> GetAllByCompanyIdAsync(Guid companyId)
+        public async Task<List<Invoice>> GetAllByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             return await _db.Invoices
                 .Include(i => i.Company)
@@ -31,13 +31,13 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.InvoiceLines)
                 .Where(i => i.CompanyId == companyId)
                 .OrderByDescending(i => i.Date)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task AddAsync(Invoice invoice)
+        public async Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default)
         {
-            await _db.Invoices.AddAsync(invoice);
-            await _db.SaveChangesAsync();
+            await _db.Invoices.AddAsync(invoice, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
         }
     }
 }

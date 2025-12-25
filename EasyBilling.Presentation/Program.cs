@@ -1,4 +1,6 @@
 using EasyBilling.ANAFIntegration.EFactura;
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
+using EasyBilling.ANAFIntegration.EFactura.Services;
 using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
@@ -77,6 +79,8 @@ builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IAnafTokenRepository, AnafTokenRepoistory>();
 builder.Services.AddScoped<IAnafIntegrationService, AnafIntegrationService>();
 builder.Services.AddScoped<IEFacturaXmlGenerator, EFacturaXmlGenerator>();
+builder.Services.AddScoped<EasyBilling.ANAFIntegration.EFactura.EFactura>();
+builder.Services.AddScoped<IEFacturaService, EFacturaService>();
 builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddOpenApi();

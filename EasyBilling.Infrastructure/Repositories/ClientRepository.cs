@@ -9,34 +9,34 @@ namespace EasyBilling.Infrastructure.Repositories
     {
         private readonly AppDbContext _db = db;
 
-        public async Task<List<Client>> GetAllClientsByCompanyIdAsync(Guid companyId)
+        public async Task<List<Client>> GetAllClientsByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             return await _db.Clients
                 .Where(c => c.CompanyId == companyId)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task<Client?> GetByIdAsync(Guid clientId)
+        public async Task<Client?> GetByIdAsync(Guid clientId, CancellationToken cancellationToken = default)
         {
-            return await _db.Clients.FindAsync(clientId);
+            return await _db.Clients.FindAsync(new object?[] { clientId }, cancellationToken: cancellationToken);
         }
 
-        public async Task<Client?> GetByCuiAndCompanyIdAsync(string cui, Guid companyId)
+        public async Task<Client?> GetByCuiAndCompanyIdAsync(string cui, Guid companyId, CancellationToken cancellationToken = default)
         {
             return await _db.Clients
-                .FirstOrDefaultAsync(c => c.CUI == cui && c.CompanyId == companyId);
+                .FirstOrDefaultAsync(c => c.CUI == cui && c.CompanyId == companyId, cancellationToken);
         }
 
-        public async Task AddAsync(Client client)
+        public async Task AddAsync(Client client, CancellationToken cancellationToken = default)
         {
-            await _db.Clients.AddAsync(client);
-            await _db.SaveChangesAsync();
+            await _db.Clients.AddAsync(client, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task DeleteAsync(Client client)
+        public async Task DeleteAsync(Client client, CancellationToken cancellationToken = default)
         {
             _db.Clients.Remove(client);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(cancellationToken);
         }
     }
 }

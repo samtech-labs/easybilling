@@ -83,9 +83,9 @@ namespace EasyBilling.Application.Services
             return company;
         }
 
-        public async Task<Company?> GetCompanyByIdAsync(Guid companyId)
+        public async Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
-            return await _companyRepository.GetByIdAsync(companyId);
+            return await _companyRepository.GetByIdAsync(companyId, cancellationToken);
         }
 
         public async Task DeleteCompanyAsync(Guid companyId)

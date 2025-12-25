@@ -5,10 +5,10 @@ namespace EasyBilling.Application.Interfaces
 {
     public interface IClientRepository
     {
-        Task<List<Client>> GetAllClientsByCompanyIdAsync(Guid companyId);
-        Task<Client?> GetByIdAsync(Guid clientId);
-        Task<Client?> GetByCuiAndCompanyIdAsync(string cui, Guid companyId);
-        Task AddAsync(Client client);
-        Task DeleteAsync(Client client);
+        Task<List<Client>> GetAllClientsByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+        Task<Client?> GetByIdAsync(Guid clientId, CancellationToken cancellationToken = default);
+        Task<Client?> GetByCuiAndCompanyIdAsync(string cui, Guid companyId, CancellationToken cancellationToken = default);
+        Task AddAsync(Client client, CancellationToken cancellationToken = default);
+        Task DeleteAsync(Client client, CancellationToken cancellationToken = default);
     }
 }

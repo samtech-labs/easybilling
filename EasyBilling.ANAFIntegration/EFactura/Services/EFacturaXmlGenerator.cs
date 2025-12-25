@@ -1,10 +1,11 @@
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.ANAFIntegration.EFactura
+namespace EasyBilling.ANAFIntegration.EFactura.Services
 {
     public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     {
