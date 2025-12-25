@@ -1,3 +1,4 @@
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Requests;
@@ -11,11 +12,13 @@ namespace EasyBilling.Application.Services
     public class InvoiceService(
         IInvoiceRepository invoiceRepository,
         ICompanyService companyService,
-        IClientRepository clientRepository) : IInvoiceService
+        IClientRepository clientRepository,
+        IEFacturaXmlGenerator eFacturaXmlGenerator) : IInvoiceService
     {
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
         private readonly ICompanyService _companyService = companyService;
         private readonly IClientRepository _clientRepository = clientRepository;
+        private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
 
         private const int MaxInvoiceLines = 5;
 
@@ -190,6 +193,11 @@ namespace EasyBilling.Application.Services
                     Unit = line.Unit
                 }).ToList()
             };
+        }
+
+        public async Task<Invoice?> GetInvoiceAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            return await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken);
         }
 
         public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId, CancellationToken cancellationToken = default)
@@ -372,6 +380,15 @@ namespace EasyBilling.Application.Services
             }).GeneratePdf();
 
             return pdfBytes;
+        }
+
+        public async Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
+                ?? throw new InvalidOperationException("Invoice not found.");
+
+            var xmlContent = _eFacturaXmlGenerator.GenerateXml(invoice);
+            return xmlContent;
         }
 
         private static ClientResponseDto MapClientToDto(Client client)

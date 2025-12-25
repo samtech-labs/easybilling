@@ -12,10 +12,14 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         public string GenerateXml(Invoice invoice)
         {
             if (invoice.Company == null)
+            {
                 throw new ArgumentException("Invoice must have Company information loaded");
+            }
 
             if (invoice.Client == null)
+            {
                 throw new ArgumentException("Invoice must have Client information loaded");
+            }
 
             var ublInvoice = ConvertToUBL(invoice);
 

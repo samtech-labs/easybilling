@@ -1,5 +1,6 @@
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
+using EasyBilling.Domain.Models;
 
 namespace EasyBilling.Application.Interfaces
 {
@@ -7,7 +8,9 @@ namespace EasyBilling.Application.Interfaces
     {
         Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken cancellationToken = default);
         Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId, CancellationToken cancellationToken = default);
+        Task<Invoice?> GetInvoiceAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default);
     }
 }

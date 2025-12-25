@@ -50,7 +50,7 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet("callback")]
         [AllowAnonymous]
-        public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state)
+        public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
             {
@@ -88,15 +88,15 @@ namespace EasyBilling.Presentation.Controllers
                     { "token_content_type", "jwt" }
                 };
 
-            var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(tokenRequest));
+            var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(tokenRequest), cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
                 return CallbackError($"Failed to exchange code for token: {errorContent}");
             }
 
-            var tokenResponse = await response.Content.ReadAsStringAsync();
+            var tokenResponse = await response.Content.ReadAsStringAsync(cancellationToken);
             var tokenData = JsonSerializer.Deserialize<AnafTokenResponseDto>(tokenResponse);
 
             if (tokenData == null || string.IsNullOrEmpty(tokenData.AccessToken))
@@ -104,7 +104,7 @@ namespace EasyBilling.Presentation.Controllers
                 return CallbackError("Invalid token response from ANAF");
             }
 
-            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId);
+            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken != null)
             {
@@ -114,7 +114,7 @@ namespace EasyBilling.Presentation.Controllers
                 existingToken.ExpiresAt = DateTime.UtcNow.AddSeconds(tokenData.ExpiresIn);
                 existingToken.CreatedAt = DateTime.UtcNow;
 
-                await _anafIntegrationService.UpdateAnafTokenAsync(existingToken);
+                await _anafIntegrationService.UpdateAnafTokenAsync(existingToken, cancellationToken);
             }
             else
             {
@@ -129,7 +129,7 @@ namespace EasyBilling.Presentation.Controllers
                     CreatedAt = DateTime.UtcNow
                 };
 
-                await _anafIntegrationService.SaveAnafTokenAsync(newToken);
+                await _anafIntegrationService.SaveAnafTokenAsync(newToken, cancellationToken);
             }
 
             return CallbackSuccess();
@@ -137,7 +137,7 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpPost("refresh")]
         [Authorize]
-        public async Task<IActionResult> RefreshToken()
+        public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken)
         {
             var userId = _currentUserService.UserId;
 
@@ -146,7 +146,7 @@ namespace EasyBilling.Presentation.Controllers
                 return Unauthorized();
             }
 
-            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId);
+            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken == null || string.IsNullOrEmpty(existingToken.RefreshToken))
             {
@@ -170,16 +170,16 @@ namespace EasyBilling.Presentation.Controllers
                 { "refresh_token", existingToken.RefreshToken }
             };
 
-            var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(tokenRequest));
+            var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(tokenRequest), cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
                 return StatusCode((int)response.StatusCode,
                     new { error = "Failed to refresh token", details = errorContent });
             }
 
-            var tokenResponse = await response.Content.ReadAsStringAsync();
+            var tokenResponse = await response.Content.ReadAsStringAsync(cancellationToken);
             var tokenData = JsonSerializer.Deserialize<AnafTokenResponseDto>(tokenResponse);
 
             if (tokenData == null || string.IsNullOrEmpty(tokenData.AccessToken))
@@ -197,7 +197,7 @@ namespace EasyBilling.Presentation.Controllers
                 existingToken.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(365);
             }
 
-            await _anafIntegrationService.UpdateAnafTokenAsync(existingToken);
+            await _anafIntegrationService.UpdateAnafTokenAsync(existingToken, cancellationToken);
 
             return Ok(new
             {
@@ -208,11 +208,11 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet("status")]
         [Authorize]
-        public async Task<IActionResult> TokenStatus()
+        public async Task<IActionResult> TokenStatus(CancellationToken cancellationToken)
         {
             var userId = _currentUserService.UserId;
 
-            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId);
+            var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken == null || string.IsNullOrEmpty(existingToken.RefreshToken))
             {

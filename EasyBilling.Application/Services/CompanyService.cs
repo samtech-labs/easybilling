@@ -104,5 +104,11 @@ namespace EasyBilling.Application.Services
 
             await _companyRepository.DeleteAsync(company);
         }
+
+        public async Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default)
+        {
+            var cleanCif = cif.Replace("RO", "").Replace(" ", "").Trim();
+            return await _companyRepository.GetByCuiAsync(cleanCif, _currentUserService.UserId, cancellationToken);
+        }
     }
 }

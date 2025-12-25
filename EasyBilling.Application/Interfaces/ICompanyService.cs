@@ -11,5 +11,6 @@ namespace EasyBilling.Application.Interfaces
         Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui);
         Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task DeleteCompanyAsync(Guid companyId);
+        Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default);
     }
 }
