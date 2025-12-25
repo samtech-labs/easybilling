@@ -21,7 +21,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Models
         public string? DueDate { get; set; }
 
         [XmlElement("InvoiceTypeCode", Namespace = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2")]
-        public string InvoiceTypeCode { get; set; } = "380"; // Commercial invoice
+        public string InvoiceTypeCode { get; set; } = "380";
 
         [XmlElement("Note", Namespace = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2")]
         public string? Note { get; set; }

@@ -1,4 +1,4 @@
-namespace EasyBilling.Application.Interfaces
+namespace EasyBilling.Application.Interfaces.Services
 {
     public interface ICurrentUserService
     {

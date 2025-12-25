@@ -1,11 +1,16 @@
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.ANAFIntegration.EFactura.Services;
 using EasyBilling.Application.Helpers;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Helpers;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Application.Jobs;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -60,6 +65,16 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+
+builder.Services.AddHangfireServer();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -82,6 +97,9 @@ builder.Services.AddScoped<IEFacturaXmlGenerator, EFacturaXmlGenerator>();
 builder.Services.AddScoped<EasyBilling.ANAFIntegration.EFactura.EFactura>();
 builder.Services.AddScoped<IEFacturaService, EFacturaService>();
 builder.Services.AddScoped<IAnafIntegrationHelper, AnafIntegrationHelper>();
+builder.Services.AddScoped<IInvoiceAnafSubmissionRepository, InvoiceAnafSubmissionRepository>();
+builder.Services.AddScoped<AnafStatusCheckJob>();
+builder.Services.AddScoped<IInvoiceAnafSubmissionService, InvoiceAnafSubmissionService>();
 builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddOpenApi();
@@ -119,6 +137,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHangfireDashboard("/hangfire");
 }
 else
 {

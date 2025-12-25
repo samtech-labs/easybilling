@@ -1,6 +1,7 @@
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Application.Dtos;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 using QuestPDF.Fluent;
@@ -386,9 +387,15 @@ namespace EasyBilling.Application.Services
         {
             var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
                 ?? throw new InvalidOperationException("Invoice not found.");
-
-            var xmlContent = _eFacturaXmlGenerator.GenerateXml(invoice);
-            return xmlContent;
+            try
+            {
+                var xmlContent = _eFacturaXmlGenerator.GenerateXml(invoice);
+                return xmlContent;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to generate XML for ANAF.", ex);
+            };
         }
 
         private static ClientResponseDto MapClientToDto(Client client)

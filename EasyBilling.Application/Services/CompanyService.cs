@@ -1,7 +1,8 @@
-using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 using EasyBilling.Application.Dtos;
+using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Application.Interfaces.Repositories;
 
 namespace EasyBilling.Application.Services
 {

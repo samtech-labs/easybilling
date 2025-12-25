@@ -1,7 +1,8 @@
 using EasyBilling.ANAFIntegration.EFactura;
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.ANAFIntegration.EFactura.Models;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 
 namespace EasyBilling.Application.Services
 {

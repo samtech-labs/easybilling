@@ -1,5 +1,5 @@
 ﻿using EasyBilling.Application.Dtos;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;

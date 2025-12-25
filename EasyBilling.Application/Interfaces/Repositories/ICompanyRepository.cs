@@ -1,6 +1,6 @@
 ﻿using EasyBilling.Domain.Models;
 
-namespace EasyBilling.Application.Interfaces
+namespace EasyBilling.Application.Interfaces.Repositories
 {
     public interface ICompanyRepository
     {

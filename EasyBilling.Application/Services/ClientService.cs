@@ -1,4 +1,5 @@
-﻿using EasyBilling.Application.Interfaces;
+﻿using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 

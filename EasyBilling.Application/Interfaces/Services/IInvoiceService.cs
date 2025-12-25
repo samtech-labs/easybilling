@@ -2,7 +2,7 @@ using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.Application.Interfaces
+namespace EasyBilling.Application.Interfaces.Services
 {
     public interface IInvoiceService
     {

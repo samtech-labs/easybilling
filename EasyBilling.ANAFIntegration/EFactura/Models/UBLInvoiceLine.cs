@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using System.Xml.Serialization;
 
 namespace EasyBilling.ANAFIntegration.EFactura.Models
@@ -26,6 +27,13 @@ namespace EasyBilling.ANAFIntegration.EFactura.Models
         public string UnitCode { get; set; } = string.Empty;
 
         [XmlText]
+        public string ValueString
+        {
+            get => Value.ToString("0.##", CultureInfo.InvariantCulture);
+            set => Value = decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+        }
+
+        [XmlIgnore]
         public decimal Value { get; set; }
     }
 
@@ -35,6 +43,13 @@ namespace EasyBilling.ANAFIntegration.EFactura.Models
         public string CurrencyID { get; set; } = "RON";
 
         [XmlText]
+        public string ValueString
+        {
+            get => Value.ToString("0.00", CultureInfo.InvariantCulture);
+            set => Value = decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+        }
+
+        [XmlIgnore]
         public decimal Value { get; set; }
     }
 
@@ -50,9 +65,16 @@ namespace EasyBilling.ANAFIntegration.EFactura.Models
     public class UBLClassifiedTaxCategory
     {
         [XmlElement("ID", Namespace = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2")]
-        public string ID { get; set; } = "S"; // Standard rate
+        public string ID { get; set; } = "S";
 
         [XmlElement("Percent", Namespace = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2")]
+        public string PercentString
+        {
+            get => Percent.ToString("0.##", CultureInfo.InvariantCulture);
+            set => Percent = decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0;
+        }
+
+        [XmlIgnore]
         public decimal Percent { get; set; }
 
         [XmlElement("TaxScheme", Namespace = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2")]

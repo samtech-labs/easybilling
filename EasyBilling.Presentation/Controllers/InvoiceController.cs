@@ -1,5 +1,6 @@
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,13 +13,11 @@ namespace EasyBilling.Presentation.Controllers
     public class InvoiceController(
         IInvoiceService invoiceService,
         IInvoiceRepository invoiceRepository,
-        IEFacturaXmlGenerator eFacturaXmlGenerator,
-        IEFacturaService eFacturaService) : ControllerBase
+        IAnafIntegrationService anafIntegrationService) : ControllerBase
     {
         private readonly IInvoiceService _invoiceService = invoiceService;
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
-        private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
-        private readonly IEFacturaService _eFacturaService = eFacturaService;
+        private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
 
         [HttpPost]
         [Route("CreateInvoice")]
@@ -93,6 +92,30 @@ namespace EasyBilling.Presentation.Controllers
             catch (Exception)
             {
                 return StatusCode(500, "An error occurred while generating the invoice PDF.");
+            }
+        }
+
+        [HttpGet]
+        [Route("SendEFactura")]
+        public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                if (invoice == null)
+                {
+                    return NotFound(new { message = "Invoice not found." });
+                }
+                var uploadInvoiceResult = await _anafIntegrationService.UploadXmlToAnaf(invoiceId, cancellationToken);
+                return Ok(uploadInvoiceResult);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while sending the invoice to ANAF.");
             }
         }
     }

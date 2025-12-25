@@ -1,8 +1,12 @@
 ﻿using EasyBilling.Application.Dtos;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Helpers;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Application.Jobs;
+using EasyBilling.Application.Responses;
 using EasyBilling.Domain.Models;
+using Hangfire;
 using Microsoft.Extensions.Configuration;
-using System.Buffers.Text;
 using System.Text;
 using System.Xml.Linq;
 
@@ -12,11 +16,17 @@ namespace EasyBilling.Application.Services
         IAnafTokenRepository anafTokenRepository,
         IInvoiceService invoiceService,
         IAnafIntegrationHelper anafIntegrationHelper,
+        IInvoiceAnafSubmissionService invoiceAnafSubmissionService,
+        IBackgroundJobClient backgroundJobs,
+        ICompanyService companyService,
         IConfiguration configuration) : IAnafIntegrationService
     {
         private readonly IAnafTokenRepository _anafTokenRepository = anafTokenRepository;
         private readonly IAnafIntegrationHelper _anafIntegrationHelper = anafIntegrationHelper;
         private readonly IInvoiceService _invoiceService = invoiceService;
+        private readonly IInvoiceAnafSubmissionService _invoiceAnafSubmissionService = invoiceAnafSubmissionService;
+        private readonly IBackgroundJobClient _backgroundJobs = backgroundJobs;
+        private readonly ICompanyService _companyService = companyService;
         private readonly IConfiguration _config = configuration;
         private string BaseUrl => _config["Anaf:EFacturaUrl"] ?? "https://api.anaf.ro/test/FCTEL/rest";
 
@@ -63,7 +73,7 @@ namespace EasyBilling.Application.Services
             return false;
         }
 
-        public async Task<string> UploadXmlToAnaf(Guid invoiceId, string xmlContent, CancellationToken cancellationToken = default)
+        public async Task<AnafUploadResult> UploadXmlToAnaf(Guid invoiceId, CancellationToken cancellationToken = default)
         {
             var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
 
@@ -78,7 +88,7 @@ namespace EasyBilling.Application.Services
                 throw new Exception("Invoice has already been accepted by ANAF");
             }
 
-            var token = await _anafIntegrationHelper.GetTokenForCifAsync(invoice.Company.CUI, cancellationToken);
+            var token = await GetTokenForCifAsync(invoice.Company.CUI, cancellationToken);
             var xml = await _invoiceService.GenerateXmlForAnaf(invoiceId, cancellationToken);
 
             var cui = invoice.Company.CUI;
@@ -86,11 +96,32 @@ namespace EasyBilling.Application.Services
 
             var uploadIndex = await UploadXmlAsync(xml, cui, token!.AccessToken, cancellationToken);
 
-            // step 1: create and save new submission record
-            // step 2: trigger background job to check status
-            // step 3: return upload result
+            var invoiceAnafSubmission = new InvoiceAnafSubmission
+            {
+                InvoiceId = invoiceId,
+                UploadIndex = uploadIndex,
+                SentXml = Encoding.UTF8.GetBytes(xml)
+            };
 
-            return uploadIndex;
+            var submission = await _invoiceAnafSubmissionService.AddAsync(invoiceAnafSubmission, cancellationToken);
+
+            if (submission != null)
+            {
+                _backgroundJobs.Schedule<AnafStatusCheckJob>(
+                    job => job.ExecuteAsync(submission.Id),
+                    TimeSpan.FromSeconds(5));
+            }
+            else
+            { 
+                throw new Exception("Failed to create ANAF submission record");
+            }
+
+            return new AnafUploadResult
+            {
+                Success = true,
+                SubmissionId = submission.Id,
+                UploadIndex = uploadIndex
+            };
         }
 
         private async Task<string> UploadXmlAsync(string xml, string cif, string accessToken, CancellationToken ct)
@@ -118,6 +149,24 @@ namespace EasyBilling.Application.Services
 
             return header?.Attribute("index_incarcare")?.Value
                 ?? throw new Exception($"Missing index_incarcare: {responseContent}");
+        }
+
+        private async Task<AnafToken?> GetTokenForCifAsync(string cif, CancellationToken ct)
+        {
+            var company = await _companyService.GetCompanyByCifAsync(cif, ct);
+            if (company is null)
+            {
+                return null;
+            }
+
+            if (company.User is null)
+            {
+                return null;
+            }
+
+            var anafToken = await GetAnafTokenByUserIdAsync(company.User.Id, ct);
+
+            return anafToken;
         }
     }
 }
