@@ -1,3 +1,4 @@
+using EasyBilling.ANAFIntegration.EFactura;
 using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
@@ -50,7 +51,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins("http://10.211.55.5:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -75,6 +76,7 @@ builder.Services.AddScoped<IClientRepository, ClientRepository>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IAnafTokenRepository, AnafTokenRepoistory>();
 builder.Services.AddScoped<IAnafIntegrationService, AnafIntegrationService>();
+builder.Services.AddScoped<IEFacturaXmlGenerator, EFacturaXmlGenerator>();
 builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddOpenApi();

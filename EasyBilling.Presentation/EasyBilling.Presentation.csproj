@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EasyBilling.ANAFIntegration\EasyBilling.ANAFIntegration.csproj" />
     <ProjectReference Include="..\EasyBilling.Application\EasyBilling.Application.csproj" />
     <ProjectReference Include="..\EasyBilling.Infrastructure\EasyBilling.Infrastructure.csproj" />
   </ItemGroup>

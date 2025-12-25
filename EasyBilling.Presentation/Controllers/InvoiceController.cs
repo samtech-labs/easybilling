@@ -1,3 +1,4 @@
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ namespace EasyBilling.Presentation.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class InvoiceController(IInvoiceService invoiceService) : ControllerBase
+    public class InvoiceController(IInvoiceService invoiceService, IInvoiceRepository invoiceRepository, IEFacturaXmlGenerator eFacturaXmlGenerator) : ControllerBase
     {
         private readonly IInvoiceService _invoiceService = invoiceService;
 
