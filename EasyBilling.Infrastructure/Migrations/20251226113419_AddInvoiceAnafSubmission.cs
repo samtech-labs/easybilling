@@ -12,7 +12,7 @@ namespace EasyBilling.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "InvoiceAnafSubmission",
+                name: "InvoiceAnafSubmissions",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -29,9 +29,9 @@ namespace EasyBilling.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_InvoiceAnafSubmission", x => x.Id);
+                    table.PrimaryKey("PK_InvoiceAnafSubmissions", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_InvoiceAnafSubmission_Invoices_InvoiceId",
+                        name: "FK_InvoiceAnafSubmissions_Invoices_InvoiceId",
                         column: x => x.InvoiceId,
                         principalTable: "Invoices",
                         principalColumn: "Id",
@@ -39,18 +39,18 @@ namespace EasyBilling.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_InvoiceAnafSubmission_InvoiceId",
-                table: "InvoiceAnafSubmission",
+                name: "IX_InvoiceAnafSubmissions_InvoiceId",
+                table: "InvoiceAnafSubmissions",
                 column: "InvoiceId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_InvoiceAnafSubmission_Status",
-                table: "InvoiceAnafSubmission",
+                name: "IX_InvoiceAnafSubmissions_Status",
+                table: "InvoiceAnafSubmissions",
                 column: "Status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_InvoiceAnafSubmission_Status_LastCheckedAt",
-                table: "InvoiceAnafSubmission",
+                name: "IX_InvoiceAnafSubmissions_Status_LastCheckedAt",
+                table: "InvoiceAnafSubmissions",
                 columns: new[] { "Status", "LastCheckedAt" });
         }
 
@@ -58,7 +58,7 @@ namespace EasyBilling.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "InvoiceAnafSubmission");
+                name: "InvoiceAnafSubmissions");
         }
     }
 }

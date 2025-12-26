@@ -3,26 +3,42 @@ using EasyBilling.Application.Interfaces.Helpers;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Domain.Models;
 using Hangfire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Xml.Linq;
 
 namespace EasyBilling.Application.Jobs
 {
-
-    public class AnafStatusCheckJob(
-        IInvoiceAnafSubmissionRepository submissionRepository,
-        IAnafIntegrationService anafIntegration,
-        IAnafIntegrationHelper anafHelper,
-        IBackgroundJobClient backgroundJobs,
-        ILogger<AnafStatusCheckJob> logger)
+    public class AnafStatusCheckJob
     {
-        private readonly IInvoiceAnafSubmissionRepository _submissionRepository = submissionRepository;
-        private readonly IAnafIntegrationService _anafIntegration = anafIntegration;
-        private readonly IAnafIntegrationHelper _anafHelper = anafHelper;
-        private readonly IBackgroundJobClient _backgroundJobs = backgroundJobs;
-        private readonly ILogger<AnafStatusCheckJob> _logger = logger;
+        private readonly IInvoiceAnafSubmissionRepository _submissionRepository;
+        private readonly IAnafIntegrationService _anafIntegration;
+        private readonly IAnafIntegrationHelper _anafHelper;
+        private readonly IBackgroundJobClient _backgroundJobs;
+        private readonly ILogger<AnafStatusCheckJob> _logger;
+        private readonly string _baseUrl;
 
         private const int MaxRetries = 20;
+
+        public AnafStatusCheckJob(
+            IInvoiceAnafSubmissionRepository submissionRepository,
+            IAnafIntegrationService anafIntegration,
+            IAnafIntegrationHelper anafHelper,
+            IBackgroundJobClient backgroundJobs,
+            IConfiguration config,
+            ILogger<AnafStatusCheckJob> logger)
+        {
+            _submissionRepository = submissionRepository;
+            _anafIntegration = anafIntegration;
+            _anafHelper = anafHelper;
+            _backgroundJobs = backgroundJobs;
+            _logger = logger;
+
+            var isTestMode = config.GetValue<bool>("Anaf:TestMode");
+            _baseUrl = isTestMode
+                ? "https://api.anaf.ro/test/FCTEL/rest"
+                : config["Anaf:EFacturaUrl"] ?? "https://api.anaf.ro/prod/FCTEL/rest";
+        }
 
         [AutomaticRetry(Attempts = 0)]
         public async Task ExecuteAsync(Guid submissionId)
@@ -67,7 +83,7 @@ namespace EasyBilling.Application.Jobs
                         break;
 
                     case "nok":
-                        HandleError(submission, result.ErrorMessage);
+                        await HandleErrorAsync(submission, result.IdDescarcare, token.AccessToken);  // ← acum e async
                         break;
 
                     default:
@@ -101,10 +117,17 @@ namespace EasyBilling.Application.Jobs
         private async Task<StatusResult> CheckStatusAsync(string uploadIndex, string accessToken)
         {
             var client = _anafHelper.CreateAuthenticatedClient(accessToken);
-            var response = await client.GetAsync($"stareMesaj?id_incarcare={uploadIndex}");
+            var url = $"{_baseUrl}/stareMesaj?id_incarcare={uploadIndex}";
+
+            var response = await client.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
 
-            _logger.LogDebug("ANAF status response: {Content}", content);
+            // DEBUG - vezi exact ce primești
+            _logger.LogInformation("=== ANAF Status Response ===");
+            _logger.LogInformation("URL: {Url}", url);
+            _logger.LogInformation("Status: {Status}", response.StatusCode);
+            _logger.LogInformation("Content: {Content}", content);
+            _logger.LogInformation("============================");
 
             var doc = XDocument.Parse(content);
             var header = doc.Root;
@@ -115,6 +138,96 @@ namespace EasyBilling.Application.Jobs
                 IdDescarcare = header?.Attribute("id_descarcare")?.Value,
                 ErrorMessage = string.Join("; ", header?.Descendants("Error").Select(e => e.Value) ?? [])
             };
+        }
+
+        private async Task HandleErrorAsync(InvoiceAnafSubmission submission, string? idDescarcare, string accessToken)
+        {
+            submission.Status = AnafSubmissionStatus.Error;
+            submission.DownloadId = idDescarcare;
+
+            // Descarcă ZIP-ul cu erorile
+            if (!string.IsNullOrEmpty(idDescarcare))
+            {
+                try
+                {
+                    var client = _anafHelper.CreateAuthenticatedClient(accessToken);
+                    var url = $"{_baseUrl}/descarcare?id={idDescarcare}";
+
+                    var response = await client.GetAsync(url);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var zipBytes = await response.Content.ReadAsByteArrayAsync();
+                        submission.SignedXml = zipBytes;
+
+                        // Extrage și loghează erorile din ZIP
+                        var errors = ExtractErrorsFromZip(zipBytes);
+                        submission.ErrorMessage = errors;
+
+                        _logger.LogWarning("✗ Invoice {InvoiceId} rejected by ANAF: {Errors}",
+                            submission.InvoiceId, errors);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to download error details");
+                    submission.ErrorMessage = "Failed to download error details from ANAF";
+                }
+            }
+            else
+            {
+                submission.ErrorMessage = "Unknown error from ANAF";
+            }
+        }
+
+        private string ExtractErrorsFromZip(byte[] zipBytes)
+        {
+            try
+            {
+                using var zipStream = new MemoryStream(zipBytes);
+                using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
+
+                foreach (var entry in archive.Entries)
+                {
+                    // Caută fișierul cu erori (de obicei are "errors" în nume sau e XML-ul principal)
+                    if (entry.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var entryStream = entry.Open();
+                        using var reader = new StreamReader(entryStream);
+                        var content = reader.ReadToEnd();
+
+                        _logger.LogInformation("ZIP entry {Name}: {Content}", entry.Name, content);
+
+                        // Încearcă să extragi mesajele de eroare din XML
+                        try
+                        {
+                            var doc = XDocument.Parse(content);
+                            var errors = doc.Descendants()
+                                .Where(e => e.Name.LocalName.Contains("Error") ||
+                                           e.Name.LocalName.Contains("Description") ||
+                                           e.Name.LocalName.Contains("Text"))
+                                .Select(e => e.Value)
+                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                .ToList();
+
+                            if (errors.Any())
+                                return string.Join("; ", errors);
+                        }
+                        catch
+                        {
+                            // Nu e XML valid, returnează raw content (truncat)
+                            return content.Length > 2000 ? content[..2000] : content;
+                        }
+                    }
+                }
+
+                return "Error details not found in ANAF response";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to extract errors from ZIP");
+                return $"Failed to parse error response: {ex.Message}";
+            }
         }
 
         private async Task HandleSuccessAsync(InvoiceAnafSubmission submission, string? idDescarcare, string accessToken)
@@ -129,7 +242,9 @@ namespace EasyBilling.Application.Jobs
                 try
                 {
                     var client = _anafHelper.CreateAuthenticatedClient(accessToken);
-                    var response = await client.GetAsync($"descarcare?id={idDescarcare}");
+                    var url = $"{_baseUrl}/descarcare?id={idDescarcare}";
+
+                    var response = await client.GetAsync(url);
 
                     if (response.IsSuccessStatusCode)
                     {

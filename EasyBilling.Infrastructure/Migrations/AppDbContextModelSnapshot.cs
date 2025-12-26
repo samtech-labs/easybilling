@@ -248,7 +248,7 @@ namespace EasyBilling.Infrastructure.Migrations
 
                     b.HasIndex("Status", "LastCheckedAt");
 
-                    b.ToTable("InvoiceAnafSubmission");
+                    b.ToTable("InvoiceAnafSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>

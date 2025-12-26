@@ -89,11 +89,18 @@ namespace EasyBilling.Application.Services
             }
 
             var token = await GetTokenForCifAsync(invoice.Company.CUI, cancellationToken);
+
+            if (token == null)
+            {
+                throw new Exception("No ANAF token found for the company's CIF");
+            }
+
             var xml = await _invoiceService.GenerateXmlForAnaf(invoiceId, cancellationToken);
 
             var cui = invoice.Company.CUI;
             cui = cui.StartsWith("RO") ? cui[2..] : cui;
 
+            // debug
             var uploadIndex = await UploadXmlAsync(xml, cui, token!.AccessToken, cancellationToken);
 
             var invoiceAnafSubmission = new InvoiceAnafSubmission
@@ -103,25 +110,32 @@ namespace EasyBilling.Application.Services
                 SentXml = Encoding.UTF8.GetBytes(xml)
             };
 
-            var submission = await _invoiceAnafSubmissionService.AddAsync(invoiceAnafSubmission, cancellationToken);
-
-            if (submission != null)
+            try
             {
-                _backgroundJobs.Schedule<AnafStatusCheckJob>(
-                    job => job.ExecuteAsync(submission.Id),
-                    TimeSpan.FromSeconds(5));
-            }
-            else
-            { 
-                throw new Exception("Failed to create ANAF submission record");
-            }
+                var submission = await _invoiceAnafSubmissionService.AddAsync(invoiceAnafSubmission, cancellationToken);
 
-            return new AnafUploadResult
+                if (submission != null)
+                {
+                    _backgroundJobs.Schedule<AnafStatusCheckJob>(
+                        job => job.ExecuteAsync(submission.Id),
+                        TimeSpan.FromSeconds(5));
+                }
+                else
+                {
+                    throw new Exception("Failed to create ANAF submission record");
+                }
+
+                return new AnafUploadResult
+                {
+                    Success = true,
+                    SubmissionId = submission.Id,
+                    UploadIndex = uploadIndex
+                };
+            }
+            catch (Exception ex)
             {
-                Success = true,
-                SubmissionId = submission.Id,
-                UploadIndex = uploadIndex
-            };
+                throw new Exception("Failed to save ANAF submission record", ex);
+            }
         }
 
         private async Task<string> UploadXmlAsync(string xml, string cif, string accessToken, CancellationToken ct)
@@ -141,14 +155,24 @@ namespace EasyBilling.Application.Services
             var doc = XDocument.Parse(responseContent);
             var header = doc.Root;
 
-            var executionStatus = header?.Attribute("ExecutionStatus")?.Value;
+            if (header == null)
+                throw new Exception($"Invalid ANAF response: {responseContent}");
+
+            var executionStatus = header.Attribute("ExecutionStatus")?.Value;
+            var indexIncarcare = header.Attribute("index_incarcare")?.Value;
+
             if (executionStatus != "0")
             {
-                throw new Exception($"Upload rejected: {responseContent}");
+                XNamespace ns = "mfp:anaf:dgti:spv:respUploadFisier:v1";
+                var errors = header.Descendants(ns + "Error").Select(e => e.Value).ToList();
+                var errorMsg = errors.Any() ? string.Join("; ", errors) : responseContent;
+                throw new Exception($"Upload rejected: {errorMsg}");
             }
 
-            return header?.Attribute("index_incarcare")?.Value
-                ?? throw new Exception($"Missing index_incarcare: {responseContent}");
+            if (string.IsNullOrEmpty(indexIncarcare))
+                throw new Exception($"Missing index_incarcare: {responseContent}");
+
+            return indexIncarcare;
         }
 
         private async Task<AnafToken?> GetTokenForCifAsync(string cif, CancellationToken ct)
@@ -159,12 +183,7 @@ namespace EasyBilling.Application.Services
                 return null;
             }
 
-            if (company.User is null)
-            {
-                return null;
-            }
-
-            var anafToken = await GetAnafTokenByUserIdAsync(company.User.Id, ct);
+            var anafToken = await GetAnafTokenByUserIdAsync(company.UserId, ct);
 
             return anafToken;
         }

@@ -1,29 +1,31 @@
+﻿using System.Globalization;
 using System.Text;
-using System.Xml;
-using System.Xml.Serialization;
+using System.Xml.Linq;
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
-using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Domain.Models;
 
 namespace EasyBilling.ANAFIntegration.EFactura.Services
 {
     public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     {
+        private static readonly XNamespace NS_INVOICE = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2";
+        private static readonly XNamespace NS_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
+        private static readonly XNamespace NS_CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
+
         public string GenerateXml(Invoice invoice)
         {
             if (invoice.Company == null)
-            {
                 throw new ArgumentException("Invoice must have Company information loaded");
-            }
 
             if (invoice.Client == null)
-            {
                 throw new ArgumentException("Invoice must have Client information loaded");
-            }
 
-            var ublInvoice = ConvertToUBL(invoice);
+            var doc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                CreateInvoiceElement(invoice)
+            );
 
-            return SerializeToXml(ublInvoice);
+            return doc.ToString();
         }
 
         public void GenerateXmlFile(Invoice invoice, string filePath)
@@ -32,289 +34,246 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
             File.WriteAllText(filePath, xml, Encoding.UTF8);
         }
 
-        private UBLInvoice ConvertToUBL(Invoice invoice)
+        private XElement CreateInvoiceElement(Invoice invoice)
         {
-            var ublInvoice = new UBLInvoice
-            {
-                ID = $"{invoice.Series}{invoice.Number}",
-                IssueDate = invoice.Date.ToString("yyyy-MM-dd"),
-                DocumentCurrencyCode = "RON",
+            // Calculează totaluri
+            var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
 
-                AccountingSupplierParty = CreateSupplierParty(invoice.Company),
-                AccountingCustomerParty = CreateCustomerParty(invoice.Client)
-            };
+            var invoiceElement = new XElement(NS_INVOICE + "Invoice",
+                new XAttribute(XNamespace.Xmlns + "cac", NS_CAC),
+                new XAttribute(XNamespace.Xmlns + "cbc", NS_CBC),
 
-            // Add invoice lines
-            if (invoice.InvoiceLines != null && invoice.InvoiceLines.Any())
+                new XElement(NS_CBC + "UBLVersionID", "2.1"),
+                new XElement(NS_CBC + "CustomizationID", "urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1"),
+                new XElement(NS_CBC + "ID", $"{invoice.Series}{invoice.Number}"),
+                new XElement(NS_CBC + "IssueDate", invoice.Date.ToString("yyyy-MM-dd")),
+                new XElement(NS_CBC + "InvoiceTypeCode", "380"),
+                new XElement(NS_CBC + "DocumentCurrencyCode", "RON"),
+
+                CreateSupplierParty(invoice.Company),
+                CreateCustomerParty(invoice.Client),
+                CreateTaxTotal(taxTotal, taxGroups),
+                CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal),
+                CreateInvoiceLines(invoice.InvoiceLines)
+            );
+
+            return invoiceElement;
+        }
+
+        private XElement CreateSupplierParty(Company company)
+        {
+            var cui = FormatCUI(company.CUI);
+
+            return new XElement(NS_CAC + "AccountingSupplierParty",
+                new XElement(NS_CAC + "Party",
+                    new XElement(NS_CBC + "EndpointID",
+                        new XAttribute("schemeID", "9958"),
+                        cui),
+                    new XElement(NS_CAC + "PartyIdentification",
+                        new XElement(NS_CBC + "ID",
+                            new XAttribute("schemeID", "0088"),
+                            cui)),
+                    new XElement(NS_CAC + "PartyName",
+                        new XElement(NS_CBC + "Name", company.Name)),
+                    new XElement(NS_CAC + "PostalAddress",
+                        new XElement(NS_CBC + "StreetName", company.Address ?? ""),
+                        new XElement(NS_CBC + "CityName", ""), // we also need to update this
+                        new XElement(NS_CBC + "CountrySubentity", company.County ?? ""),
+                        new XElement(NS_CAC + "Country",
+                            new XElement(NS_CBC + "IdentificationCode", "RO"))),
+                    new XElement(NS_CAC + "PartyTaxScheme",
+                        new XElement(NS_CBC + "CompanyID", cui),
+                        new XElement(NS_CAC + "TaxScheme",
+                            new XElement(NS_CBC + "ID", "VAT"))),
+                    new XElement(NS_CAC + "PartyLegalEntity",
+                        new XElement(NS_CBC + "RegistrationName", company.Name),
+                        string.IsNullOrEmpty(company.RegNumber) ? null :
+                            new XElement(NS_CBC + "CompanyID", company.RegNumber))
+                )
+            );
+        }
+
+        private XElement CreateCustomerParty(Client client)
+        {
+            var cui = FormatCUI(client.CUI);
+
+            return new XElement(NS_CAC + "AccountingCustomerParty",
+                new XElement(NS_CAC + "Party",
+                    new XElement(NS_CBC + "EndpointID",
+                        new XAttribute("schemeID", "9958"),
+                        cui),
+                    new XElement(NS_CAC + "PartyIdentification",
+                        new XElement(NS_CBC + "ID",
+                            new XAttribute("schemeID", "0088"),
+                            cui)),
+                    new XElement(NS_CAC + "PartyName",
+                        new XElement(NS_CBC + "Name", client.Name)),
+                    new XElement(NS_CAC + "PostalAddress",
+                        new XElement(NS_CBC + "StreetName", client.Address ?? ""),
+                        new XElement(NS_CBC + "CityName", ""), // we need to add this to the invoice model
+                        new XElement(NS_CBC + "CountrySubentity", client.County ?? ""),
+                        new XElement(NS_CAC + "Country",
+                            new XElement(NS_CBC + "IdentificationCode", "RO"))),
+                    new XElement(NS_CAC + "PartyTaxScheme",
+                        new XElement(NS_CBC + "CompanyID", cui),
+                        new XElement(NS_CAC + "TaxScheme",
+                            new XElement(NS_CBC + "ID", "VAT"))),
+                    new XElement(NS_CAC + "PartyLegalEntity",
+                        new XElement(NS_CBC + "RegistrationName", client.Name),
+                        string.IsNullOrEmpty(client.RegNumber) ? null :
+                            new XElement(NS_CBC + "CompanyID", client.RegNumber))
+                )
+            );
+        }
+
+        private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups)
+        {
+            var taxSubtotals = taxGroups.Select(g =>
+                new XElement(NS_CAC + "TaxSubtotal",
+                    new XElement(NS_CBC + "TaxableAmount",
+                        new XAttribute("currencyID", "RON"),
+                        FormatDecimal(g.Value.taxableAmount)),
+                    new XElement(NS_CBC + "TaxAmount",
+                        new XAttribute("currencyID", "RON"),
+                        FormatDecimal(g.Value.taxAmount)),
+                    new XElement(NS_CAC + "TaxCategory",
+                        new XElement(NS_CBC + "ID", GetTaxCategoryCode(g.Key)),
+                        new XElement(NS_CBC + "Percent", FormatDecimal(g.Key)),
+                        new XElement(NS_CAC + "TaxScheme",
+                            new XElement(NS_CBC + "ID", "VAT"))))
+            );
+
+            return new XElement(NS_CAC + "TaxTotal",
+                new XElement(NS_CBC + "TaxAmount",
+                    new XAttribute("currencyID", "RON"),
+                    FormatDecimal(totalTax)),
+                taxSubtotals
+            );
+        }
+
+        private XElement CreateLegalMonetaryTotal(decimal lineExtensionTotal, decimal taxTotal)
+        {
+            var totalWithTax = lineExtensionTotal + taxTotal;
+
+            return new XElement(NS_CAC + "LegalMonetaryTotal",
+                new XElement(NS_CBC + "LineExtensionAmount",
+                    new XAttribute("currencyID", "RON"),
+                    FormatDecimal(lineExtensionTotal)),
+                new XElement(NS_CBC + "TaxExclusiveAmount",
+                    new XAttribute("currencyID", "RON"),
+                    FormatDecimal(lineExtensionTotal)),
+                new XElement(NS_CBC + "TaxInclusiveAmount",
+                    new XAttribute("currencyID", "RON"),
+                    FormatDecimal(totalWithTax)),
+                new XElement(NS_CBC + "PayableAmount",
+                    new XAttribute("currencyID", "RON"),
+                    FormatDecimal(totalWithTax))
+            );
+        }
+
+        private IEnumerable<XElement> CreateInvoiceLines(ICollection<InvoiceLine>? lines)
+        {
+            if (lines == null || !lines.Any())
+                yield break;
+
+            var lineNumber = 1;
+            foreach (var line in lines)
             {
-                var lineNumber = 1;
-                foreach (var line in invoice.InvoiceLines)
-                {
-                    ublInvoice.InvoiceLine.Add(CreateInvoiceLine(line, lineNumber));
-                    lineNumber++;
-                }
+                var lineTotal = line.Quantity * line.UnitPrice;
+
+                yield return new XElement(NS_CAC + "InvoiceLine",
+                    new XElement(NS_CBC + "ID", lineNumber.ToString()),
+                    new XElement(NS_CBC + "InvoicedQuantity",
+                        new XAttribute("unitCode", MapUnitCode(line.Unit)),
+                        FormatQuantity(line.Quantity)),
+                    new XElement(NS_CBC + "LineExtensionAmount",
+                        new XAttribute("currencyID", "RON"),
+                        FormatDecimal(lineTotal)),
+                    new XElement(NS_CAC + "Item",
+                        new XElement(NS_CBC + "Name", line.Description ?? ""),
+                        new XElement(NS_CAC + "ClassifiedTaxCategory",
+                            new XElement(NS_CBC + "ID", GetTaxCategoryCode(line.VatRate)),
+                            new XElement(NS_CBC + "Percent", FormatDecimal(line.VatRate)),
+                            new XElement(NS_CAC + "TaxScheme",
+                                new XElement(NS_CBC + "ID", "VAT")))),
+                    new XElement(NS_CAC + "Price",
+                        new XElement(NS_CBC + "PriceAmount",
+                            new XAttribute("currencyID", "RON"),
+                            FormatDecimal(line.UnitPrice)))
+                );
+
+                lineNumber++;
             }
-
-            // Calculate totals
-            CalculateTotals(invoice, ublInvoice);
-
-            return ublInvoice;
         }
 
-        private UBLSupplierParty CreateSupplierParty(Company company)
+        private (decimal lineExtensionTotal, decimal taxTotal, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups)
+            CalculateTotals(Invoice invoice)
         {
-            return new UBLSupplierParty
-            {
-                Party = new UBLParty
-                {
-                    EndpointID = new UBLEndpointID
-                    {
-                        SchemeID = "9958",
-                        Value = FormatCUI(company.CUI)
-                    },
-                    PartyIdentification = new List<UBLPartyIdentification>
-                    {
-                        new UBLPartyIdentification
-                        {
-                            ID = new UBLIdentifier
-                            {
-                                SchemeID = "0088",
-                                Value = FormatCUI(company.CUI)
-                            }
-                        }
-                    },
-                    PartyName = new UBLPartyName
-                    {
-                        Name = company.Name
-                    },
-                    PostalAddress = new UBLPostalAddress
-                    {
-                        StreetName = company.Address,
-                        CountrySubentity = company.County,
-                        Country = new UBLCountry { IdentificationCode = "RO" }
-                    },
-                    PartyTaxScheme = new List<UBLPartyTaxScheme>
-                    {
-                        new UBLPartyTaxScheme
-                        {
-                            CompanyID = FormatCUI(company.CUI),
-                            TaxScheme = new UBLTaxScheme { ID = "VAT" }
-                        }
-                    },
-                    PartyLegalEntity = new UBLPartyLegalEntity
-                    {
-                        RegistrationName = company.Name,
-                        CompanyID = string.IsNullOrEmpty(company.RegNumber)
-                            ? null
-                            : new UBLIdentifier { Value = company.RegNumber }
-                    }
-                }
-            };
-        }
-
-        private UBLCustomerParty CreateCustomerParty(Client client)
-        {
-            return new UBLCustomerParty
-            {
-                Party = new UBLParty
-                {
-                    EndpointID = new UBLEndpointID
-                    {
-                        SchemeID = "9958",
-                        Value = FormatCUI(client.CUI)
-                    },
-                    PartyIdentification = new List<UBLPartyIdentification>
-                    {
-                        new UBLPartyIdentification
-                        {
-                            ID = new UBLIdentifier
-                            {
-                                SchemeID = "0088",
-                                Value = FormatCUI(client.CUI)
-                            }
-                        }
-                    },
-                    PartyName = new UBLPartyName
-                    {
-                        Name = client.Name
-                    },
-                    PostalAddress = new UBLPostalAddress
-                    {
-                        StreetName = client.Address,
-                        CountrySubentity = client.County,
-                        Country = new UBLCountry { IdentificationCode = "RO" }
-                    },
-                    PartyTaxScheme = new List<UBLPartyTaxScheme>
-                    {
-                        new UBLPartyTaxScheme
-                        {
-                            CompanyID = FormatCUI(client.CUI),
-                            TaxScheme = new UBLTaxScheme { ID = "VAT" }
-                        }
-                    },
-                    PartyLegalEntity = new UBLPartyLegalEntity
-                    {
-                        RegistrationName = client.Name,
-                        CompanyID = string.IsNullOrEmpty(client.RegNumber)
-                            ? null
-                            : new UBLIdentifier { Value = client.RegNumber }
-                    }
-                }
-            };
-        }
-
-        private UBLInvoiceLine CreateInvoiceLine(InvoiceLine line, int lineNumber)
-        {
-            var lineExtensionAmount = line.Quantity * line.UnitPrice;
-
-            return new UBLInvoiceLine
-            {
-                ID = lineNumber.ToString(),
-                InvoicedQuantity = new UBLQuantity
-                {
-                    UnitCode = MapUnitCode(line.Unit),
-                    Value = line.Quantity
-                },
-                LineExtensionAmount = new UBLAmount
-                {
-                    CurrencyID = "RON",
-                    Value = lineExtensionAmount
-                },
-                Item = new UBLItem
-                {
-                    Name = line.Description,
-                    ClassifiedTaxCategory = new UBLClassifiedTaxCategory
-                    {
-                        ID = GetTaxCategoryCode(line.VatRate),
-                        Percent = line.VatRate,
-                        TaxScheme = new UBLTaxScheme { ID = "VAT" }
-                    }
-                },
-                Price = new UBLPrice
-                {
-                    PriceAmount = new UBLAmount
-                    {
-                        CurrencyID = "RON",
-                        Value = line.UnitPrice
-                    }
-                }
-            };
-        }
-
-        private void CalculateTotals(Invoice invoice, UBLInvoice ublInvoice)
-        {
-            decimal totalLineExtension = 0;
-            var taxGroups = new Dictionary<decimal, decimal>(); // VatRate -> TaxableAmount
+            decimal lineExtensionTotal = 0;
+            var taxGroups = new Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)>();
 
             if (invoice.InvoiceLines != null)
             {
                 foreach (var line in invoice.InvoiceLines)
                 {
                     var lineTotal = line.Quantity * line.UnitPrice;
-                    totalLineExtension += lineTotal;
+                    lineExtensionTotal += lineTotal;
 
                     if (!taxGroups.ContainsKey(line.VatRate))
-                        taxGroups[line.VatRate] = 0;
+                        taxGroups[line.VatRate] = (0, 0);
 
-                    taxGroups[line.VatRate] += lineTotal;
+                    var current = taxGroups[line.VatRate];
+                    var lineTax = lineTotal * (line.VatRate / 100);
+                    taxGroups[line.VatRate] = (current.taxableAmount + lineTotal, current.taxAmount + lineTax);
                 }
             }
 
-            decimal totalTaxAmount = 0;
-            var taxSubtotals = new List<UBLTaxSubtotal>();
+            var taxTotal = taxGroups.Values.Sum(g => g.taxAmount);
 
-            foreach (var taxGroup in taxGroups)
-            {
-                var vatRate = taxGroup.Key;
-                var taxableAmount = taxGroup.Value;
-                var taxAmount = taxableAmount * (vatRate / 100);
-                totalTaxAmount += taxAmount;
-
-                taxSubtotals.Add(new UBLTaxSubtotal
-                {
-                    TaxableAmount = new UBLAmount { CurrencyID = "RON", Value = taxableAmount },
-                    TaxAmount = new UBLAmount { CurrencyID = "RON", Value = taxAmount },
-                    TaxCategory = new UBLTaxCategory
-                    {
-                        ID = GetTaxCategoryCode(vatRate),
-                        Percent = vatRate,
-                        TaxScheme = new UBLTaxScheme { ID = "VAT" }
-                    }
-                });
-            }
-
-            ublInvoice.TaxTotal = new List<UBLTaxTotal>
-            {
-                new UBLTaxTotal
-                {
-                    TaxAmount = new UBLAmount { CurrencyID = "RON", Value = totalTaxAmount },
-                    TaxSubtotal = taxSubtotals
-                }
-            };
-
-            ublInvoice.LegalMonetaryTotal = new UBLMonetaryTotal
-            {
-                LineExtensionAmount = new UBLAmount { CurrencyID = "RON", Value = totalLineExtension },
-                TaxExclusiveAmount = new UBLAmount { CurrencyID = "RON", Value = totalLineExtension },
-                TaxInclusiveAmount = new UBLAmount { CurrencyID = "RON", Value = totalLineExtension + totalTaxAmount },
-                PayableAmount = new UBLAmount { CurrencyID = "RON", Value = totalLineExtension + totalTaxAmount }
-            };
+            return (lineExtensionTotal, taxTotal, taxGroups);
         }
 
-        private string FormatCUI(string cui)
+        #region Helpers
+
+        private static string FormatCUI(string? cui)
         {
-            // Ensure CUI starts with RO for Romanian tax numbers
-            var cleanCui = cui?.Trim().ToUpper() ?? "";
-            if (!cleanCui.StartsWith("RO"))
-                cleanCui = "RO" + cleanCui;
-            return cleanCui;
+            var clean = cui?.Trim().ToUpper().Replace(" ", "") ?? "";
+            if (!clean.StartsWith("RO"))
+                clean = "RO" + clean;
+            return clean;
         }
 
-        private string MapUnitCode(string unit)
+        private static string FormatDecimal(decimal value)
         {
-            // Map common Romanian units to UN/ECE Recommendation 20 codes
+            return value.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatQuantity(decimal value)
+        {
+            return value.ToString("0.##", CultureInfo.InvariantCulture);
+        }
+
+        private static string GetTaxCategoryCode(decimal vatRate)
+        {
+            return vatRate == 0 ? "Z" : "S";
+        }
+
+        private static string MapUnitCode(string? unit)
+        {
             return unit?.ToLower() switch
             {
-                "buc" or "bucata" or "bucati" => "H87", // Piece
+                "buc" or "bucata" or "bucati" => "H87",
                 "kg" or "kilogram" => "KGM",
                 "l" or "litru" or "litri" => "LTR",
                 "m" or "metru" or "metri" => "MTR",
-                "mp" or "m2" => "MTK", // Square meter
-                "ora" or "ore" => "HUR", // Hour
+                "mp" or "m2" => "MTK",
+                "ora" or "ore" => "HUR",
                 "zi" or "zile" => "DAY",
                 "luna" or "luni" => "MON",
-                _ => "H87" // Default to piece
+                _ => "H87"
             };
         }
 
-        private string GetTaxCategoryCode(decimal vatRate)
-        {
-            // S = Standard rate, Z = Zero rated, E = Exempt
-            if (vatRate == 0)
-                return "Z";
-            return "S";
-        }
-
-        private string SerializeToXml(UBLInvoice invoice)
-        {
-            var namespaces = new XmlSerializerNamespaces();
-            namespaces.Add("", "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2");
-            namespaces.Add("cac", "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2");
-            namespaces.Add("cbc", "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2");
-
-            var serializer = new XmlSerializer(typeof(UBLInvoice));
-            var settings = new XmlWriterSettings
-            {
-                Indent = true,
-                Encoding = Encoding.UTF8,
-                OmitXmlDeclaration = false
-            };
-
-            using var stringWriter = new StringWriter();
-            using var xmlWriter = XmlWriter.Create(stringWriter, settings);
-
-            serializer.Serialize(xmlWriter, invoice, namespaces);
-            return stringWriter.ToString();
-        }
+        #endregion
     }
 }

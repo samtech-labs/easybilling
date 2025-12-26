@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251225162422_AddInvoiceAnafSubmission")]
+    [Migration("20251226113419_AddInvoiceAnafSubmission")]
     partial class AddInvoiceAnafSubmission
     {
         /// <inheritdoc />
@@ -251,7 +251,7 @@ namespace EasyBilling.Infrastructure.Migrations
 
                     b.HasIndex("Status", "LastCheckedAt");
 
-                    b.ToTable("InvoiceAnafSubmission");
+                    b.ToTable("InvoiceAnafSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>

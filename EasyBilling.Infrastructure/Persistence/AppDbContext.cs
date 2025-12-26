@@ -47,6 +47,8 @@ namespace EasyBilling.Infrastructure.Persistence
 
             modelBuilder.Entity<InvoiceAnafSubmission>(entity =>
             {
+                entity.ToTable("InvoiceAnafSubmissions");
+
                 entity.HasKey(e => e.Id);
 
                 entity.HasOne(e => e.Invoice)
