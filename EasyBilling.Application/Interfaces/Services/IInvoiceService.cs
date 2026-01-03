@@ -1,3 +1,4 @@
+using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
@@ -13,5 +14,7 @@ namespace EasyBilling.Application.Interfaces.Services
         Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default);
     }
 }

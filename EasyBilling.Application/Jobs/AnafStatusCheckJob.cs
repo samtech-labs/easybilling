@@ -20,7 +20,7 @@ namespace EasyBilling.Application.Jobs
         private readonly string _baseUrl;
 
         private const int MaxRetries = 20;
-        private const int MaxTechnicalErrorRetries = 5;
+        private const int MaxTechnicalErrorRetries = 5; // this should be pinged only once
 
         public AnafStatusCheckJob(
             IInvoiceAnafSubmissionRepository submissionRepository,

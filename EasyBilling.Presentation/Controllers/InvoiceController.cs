@@ -137,5 +137,49 @@ namespace EasyBilling.Presentation.Controllers
                 return StatusCode(500, "An error occurred while sending the invoice to ANAF.");
             }
         }
+
+        [HttpGet]
+        [Route("GetAnafSubmissionStatus")]
+        public async Task<IActionResult> GetAnafSubmissionStatus(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var status = await _invoiceService.GetAnafSubmissionStatusAsync(invoiceId, cancellationToken);
+                return Ok(status);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the ANAF submission status.");
+            }
+        }
+
+        [HttpGet]
+        [Route("DownloadAnafResponse")]
+        public async Task<IActionResult> DownloadAnafResponse(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var downloadResponse = await _invoiceService.DownloadAnafResponseAsync(invoiceId, cancellationToken);
+
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                var fileName = invoice != null
+                    ? $"ANAF_Response_{invoice.Series}_{invoice.Number}.zip"
+                    : $"ANAF_Response_{invoiceId}.zip";
+
+                return File(downloadResponse.ZipContent, "application/zip", fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while downloading the ANAF response.");
+            }
+        }
     }
 }

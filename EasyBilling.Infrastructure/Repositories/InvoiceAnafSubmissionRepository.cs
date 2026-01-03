@@ -39,7 +39,10 @@ public class InvoiceAnafSubmissionRepository : IInvoiceAnafSubmissionRepository
     public async Task<InvoiceAnafSubmission?> GetSuccessfulByInvoiceIdAsync(Guid invoiceId, CancellationToken ct = default)
     {
         return await _dbContext.InvoiceAnafSubmissions
+            .Include(s => s.Invoice)
+                .ThenInclude(i => i.Company)
             .Where(s => s.InvoiceId == invoiceId && s.Status == AnafSubmissionStatus.Ok)
+            .OrderByDescending(s => s.UploadedAt)
             .FirstOrDefaultAsync(ct);
     }
 

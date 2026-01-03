@@ -17,5 +17,12 @@ namespace EasyBilling.Application.Interfaces.Services
             Guid companyId,
             bool useProduction = false,
             CancellationToken cancellationToken = default);
+
+        Task<EFacturaDownloadResponse> DownloadAnafSignedInvoiceAsync(
+            Guid invoiceId,
+            Guid companyId,
+            string downloadId,
+            bool useProduction = false,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -79,5 +79,52 @@ namespace EasyBilling.Application.Services
 
             return uploadResponse;
         }
+
+        public async Task<EFacturaDownloadResponse> DownloadAnafSignedInvoiceAsync(
+            Guid invoiceId,
+            Guid companyId,
+            string downloadId,
+            bool useProduction = false,
+            CancellationToken cancellationToken = default)
+        {
+            var invoice = await _invoiceRepository.GetByIdAsync(invoiceId, cancellationToken);
+
+            if (invoice == null)
+            {
+                throw new InvalidOperationException($"Invoice with ID '{invoiceId}' not found.");
+            }
+
+            if (invoice.CompanyId != companyId)
+            {
+                throw new InvalidOperationException("Invoice does not belong to the specified company.");
+            }
+
+            // Get the user ID from the company
+            var userId = invoice.Company.UserId;
+
+            // Get the ANAF token for the user
+            var anafToken = await _anafTokenRepository.GetByUserIdAsync(userId, cancellationToken);
+
+            if (anafToken == null)
+            {
+                throw new InvalidOperationException("No ANAF token found for this user. Please authenticate with ANAF first.");
+            }
+
+            // Check if access token is expired
+            if (anafToken.AccessTokenExpiresAt <= DateTime.UtcNow)
+            {
+                throw new InvalidOperationException("ANAF access token has expired. Please re-authenticate with ANAF.");
+            }
+
+            var accessToken = anafToken.AccessToken;
+
+            var downloadResponse = await _eFactura.DownloadAsync(
+                downloadId,
+                accessToken,
+                useProduction,
+                cancellationToken);
+
+            return downloadResponse;
+        }
     }
 }

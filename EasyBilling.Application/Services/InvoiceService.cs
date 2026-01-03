@@ -1,4 +1,5 @@
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
+using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
@@ -14,12 +15,16 @@ namespace EasyBilling.Application.Services
         IInvoiceRepository invoiceRepository,
         ICompanyService companyService,
         IClientRepository clientRepository,
-        IEFacturaXmlGenerator eFacturaXmlGenerator) : IInvoiceService
+        IEFacturaXmlGenerator eFacturaXmlGenerator,
+        IInvoiceAnafSubmissionRepository anafSubmissionRepository,
+        IEFacturaService eFacturaService) : IInvoiceService
     {
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
         private readonly ICompanyService _companyService = companyService;
         private readonly IClientRepository _clientRepository = clientRepository;
         private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
+        private readonly IInvoiceAnafSubmissionRepository _anafSubmissionRepository = anafSubmissionRepository;
+        private readonly IEFacturaService _eFacturaService = eFacturaService;
 
         private const int MaxInvoiceLines = 5;
 
@@ -510,6 +515,76 @@ namespace EasyBilling.Application.Services
                     Unit = line.Unit
                 }).ToList() ?? new List<InvoiceLineResponseDto>()
             };
+        }
+
+        public async Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var latestSubmission = await _anafSubmissionRepository.GetLatestByInvoiceIdAsync(invoiceId, cancellationToken);
+
+            if (latestSubmission == null)
+            {
+                // No submission exists yet - return a default status
+                return new AnafSubmissionStatusDto
+                {
+                    Id = null,
+                    Status = AnafSubmissionStatus.Pending,
+                    ErrorMessage = null,
+                    UploadedAt = null,
+                    LastCheckedAt = null,
+                    DownloadId = null
+                };
+            }
+
+            return new AnafSubmissionStatusDto
+            {
+                Id = latestSubmission.Id,
+                Status = latestSubmission.Status,
+                ErrorMessage = latestSubmission.ErrorMessage,
+                UploadedAt = latestSubmission.UploadedAt,
+                LastCheckedAt = latestSubmission.LastCheckedAt,
+                DownloadId = latestSubmission.DownloadId
+            };
+        }
+
+        public async Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var successfulSubmission = await _anafSubmissionRepository.GetSuccessfulByInvoiceIdAsync(invoiceId, cancellationToken);
+
+            if (successfulSubmission == null)
+            {
+                throw new InvalidOperationException("No successful ANAF submission found for this invoice.");
+            }
+
+            if (successfulSubmission.DownloadId == null)
+            {
+                throw new InvalidOperationException("No download ID available for the successful ANAF submission.");
+            }
+
+            try
+            {
+                var downloadResponse = await _eFacturaService.DownloadAnafSignedInvoiceAsync(invoiceId, successfulSubmission.Invoice.CompanyId, successfulSubmission.DownloadId, cancellationToken: cancellationToken);
+
+                if (downloadResponse == null || !downloadResponse.Success)
+                {
+                    throw new InvalidOperationException("Failed to download ANAF response.");
+                }
+
+                if (downloadResponse.ZipContent == null || downloadResponse.ZipContent.Length == 0)
+                {
+                    throw new InvalidOperationException("Downloaded ANAF response is empty.");
+                }
+
+                if (downloadResponse.ErrorMessage != null)
+                {
+                    throw new InvalidOperationException($"Error in downloaded ANAF response: {downloadResponse.ErrorMessage}");
+                }
+
+                return downloadResponse;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to download ANAF response.", ex);
+            }
         }
     }
 }

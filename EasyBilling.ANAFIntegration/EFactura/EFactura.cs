@@ -1,7 +1,8 @@
-using System.Text;
-using System.Text.Json;
 using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Domain.Models;
+using System.Text;
+using System.Text.Json;
+using System.Xml.Linq;
 
 namespace EasyBilling.ANAFIntegration.EFactura
 {
@@ -81,10 +82,96 @@ namespace EasyBilling.ANAFIntegration.EFactura
             return uploadResponse;
         }
 
-        // Future e-factura functions will be added here
-        // Examples:
-        // - GetInvoiceStatusAsync
-        // - DownloadInvoiceAsync
-        // - GetMessagesAsync
+        /// <summary>
+        /// Downloads the signed invoice ZIP from ANAF
+        /// </summary>
+        /// <param name="downloadId">The id_descarcare received from status check</param>
+        /// <param name="accessToken">The ANAF access token</param>
+        /// <param name="useProduction">Whether to use production environment</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>ZIP file as byte array containing signed invoice</returns>
+        public async Task<EFacturaDownloadResponse> DownloadAsync(
+            string downloadId,
+            string accessToken,
+            bool useProduction = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(downloadId))
+                throw new ArgumentException("Download ID is required", nameof(downloadId));
+
+            var baseUrl = useProduction ? AnafProdBaseUrl : AnafTestBaseUrl;
+            var downloadUrl = $"{baseUrl}/descarcare?id={downloadId}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+            request.Headers.Add("Authorization", $"Bearer {accessToken}");
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new HttpRequestException(
+                    $"ANAF download failed with status {response.StatusCode}: {errorContent}");
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var zipBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+
+            // Check if response is XML (error) instead of ZIP
+            if (contentType?.Contains("xml") == true || IsXmlContent(zipBytes))
+            {
+                var xmlContent = Encoding.UTF8.GetString(zipBytes);
+                var errors = ParseErrorsFromXml(xmlContent);
+
+                return new EFacturaDownloadResponse
+                {
+                    Success = false,
+                    ErrorMessage = errors ?? "Unknown error from ANAF",
+                    ZipContent = null
+                };
+            }
+
+            return new EFacturaDownloadResponse
+            {
+                Success = true,
+                ZipContent = zipBytes,
+                ErrorMessage = null
+            };
+        }
+
+        #region Private Helpers
+
+        private static bool IsXmlContent(byte[] content)
+        {
+            if (content.Length < 5)
+                return false;
+
+            // Check for XML declaration or root element
+            var start = Encoding.UTF8.GetString(content, 0, Math.Min(100, content.Length));
+            return start.TrimStart().StartsWith("<?xml") || start.TrimStart().StartsWith("<");
+        }
+
+        private static string? ParseErrorsFromXml(string xmlContent)
+        {
+            try
+            {
+                var doc = XDocument.Parse(xmlContent);
+                var errors = doc.Descendants()
+                    .Where(e => e.Name.LocalName.Contains("Error"))
+                    .Select(e => e.Attribute("errorMessage")?.Value ?? e.Value)
+                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                    .Distinct()
+                    .ToList();
+
+                return errors.Any() ? string.Join("; ", errors) : null;
+            }
+            catch
+            {
+                return xmlContent.Length > 500 ? xmlContent[..500] : xmlContent;
+            }
+        }
+
+        #endregion
+
     }
 }
