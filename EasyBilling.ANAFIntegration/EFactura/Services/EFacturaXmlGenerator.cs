@@ -3,6 +3,7 @@ using System.Text;
 using System.Xml.Linq;
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Domain.Models;
+using EasyBilling.ANAFIntegration.EFactura.Helpers;
 
 namespace EasyBilling.ANAFIntegration.EFactura.Services
 {
@@ -36,8 +37,11 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
 
         private XElement CreateInvoiceElement(Invoice invoice)
         {
-            // Calculează totaluri
             var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
+
+            // DueDate - dacă nu e setat, folosește IssueDate
+            //  var dueDate = invoice.DueDate ?? invoice.Date;
+            var dueDate = invoice.Date;
 
             var invoiceElement = new XElement(NS_INVOICE + "Invoice",
                 new XAttribute(XNamespace.Xmlns + "cac", NS_CAC),
@@ -45,8 +49,9 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
 
                 new XElement(NS_CBC + "UBLVersionID", "2.1"),
                 new XElement(NS_CBC + "CustomizationID", "urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1"),
-                new XElement(NS_CBC + "ID", $"{invoice.Series}{invoice.Number}"),
+                new XElement(NS_CBC + "ID", $"{invoice.Series} nr. {invoice.Number}"),
                 new XElement(NS_CBC + "IssueDate", invoice.Date.ToString("yyyy-MM-dd")),
+                new XElement(NS_CBC + "DueDate", dueDate.ToString("yyyy-MM-dd")),
                 new XElement(NS_CBC + "InvoiceTypeCode", "380"),
                 new XElement(NS_CBC + "DocumentCurrencyCode", "RON"),
 
@@ -63,22 +68,15 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         private XElement CreateSupplierParty(Company company)
         {
             var cui = FormatCUI(company.CUI);
+            var countyCode = LocationHelper.GetCountyCode(company.County);
+            var city = LocationHelper.NormalizeCity(company.City);
 
             return new XElement(NS_CAC + "AccountingSupplierParty",
                 new XElement(NS_CAC + "Party",
-                    new XElement(NS_CBC + "EndpointID",
-                        new XAttribute("schemeID", "9958"),
-                        cui),
-                    new XElement(NS_CAC + "PartyIdentification",
-                        new XElement(NS_CBC + "ID",
-                            new XAttribute("schemeID", "0088"),
-                            cui)),
-                    new XElement(NS_CAC + "PartyName",
-                        new XElement(NS_CBC + "Name", company.Name)),
                     new XElement(NS_CAC + "PostalAddress",
                         new XElement(NS_CBC + "StreetName", company.Address ?? ""),
-                        new XElement(NS_CBC + "CityName", ""), // we also need to update this
-                        new XElement(NS_CBC + "CountrySubentity", company.County ?? ""),
+                        new XElement(NS_CBC + "CityName", city),
+                        new XElement(NS_CBC + "CountrySubentity", countyCode),
                         new XElement(NS_CAC + "Country",
                             new XElement(NS_CBC + "IdentificationCode", "RO"))),
                     new XElement(NS_CAC + "PartyTaxScheme",
@@ -96,22 +94,18 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         private XElement CreateCustomerParty(Client client)
         {
             var cui = FormatCUI(client.CUI);
+            var countyCode = LocationHelper.GetCountyCode(client.County);
+            var city = LocationHelper.NormalizeCity(client.City);
 
             return new XElement(NS_CAC + "AccountingCustomerParty",
                 new XElement(NS_CAC + "Party",
-                    new XElement(NS_CBC + "EndpointID",
-                        new XAttribute("schemeID", "9958"),
-                        cui),
-                    new XElement(NS_CAC + "PartyIdentification",
-                        new XElement(NS_CBC + "ID",
-                            new XAttribute("schemeID", "0088"),
-                            cui)),
-                    new XElement(NS_CAC + "PartyName",
-                        new XElement(NS_CBC + "Name", client.Name)),
+                    string.IsNullOrEmpty(client.RegNumber) ? null :
+                        new XElement(NS_CAC + "PartyIdentification",
+                            new XElement(NS_CBC + "ID", client.RegNumber)),
                     new XElement(NS_CAC + "PostalAddress",
                         new XElement(NS_CBC + "StreetName", client.Address ?? ""),
-                        new XElement(NS_CBC + "CityName", ""), // we need to add this to the invoice model
-                        new XElement(NS_CBC + "CountrySubentity", client.County ?? ""),
+                        new XElement(NS_CBC + "CityName", city),
+                        new XElement(NS_CBC + "CountrySubentity", countyCode),
                         new XElement(NS_CAC + "Country",
                             new XElement(NS_CBC + "IdentificationCode", "RO"))),
                     new XElement(NS_CAC + "PartyTaxScheme",
@@ -119,9 +113,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                         new XElement(NS_CAC + "TaxScheme",
                             new XElement(NS_CBC + "ID", "VAT"))),
                     new XElement(NS_CAC + "PartyLegalEntity",
-                        new XElement(NS_CBC + "RegistrationName", client.Name),
-                        string.IsNullOrEmpty(client.RegNumber) ? null :
-                            new XElement(NS_CBC + "CompanyID", client.RegNumber))
+                        new XElement(NS_CBC + "RegistrationName", client.Name))
                 )
             );
         }
@@ -250,7 +242,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
 
         private static string FormatQuantity(decimal value)
         {
-            return value.ToString("0.##", CultureInfo.InvariantCulture);
+            return value.ToString("0.0000", CultureInfo.InvariantCulture);
         }
 
         private static string GetTaxCategoryCode(decimal vatRate)
@@ -262,7 +254,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         {
             return unit?.ToLower() switch
             {
-                "buc" or "bucata" or "bucati" => "H87",
+                "buc" or "bucata" or "bucati" => "EA",
                 "kg" or "kilogram" => "KGM",
                 "l" or "litru" or "litri" => "LTR",
                 "m" or "metru" or "metri" => "MTR",
@@ -270,7 +262,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                 "ora" or "ore" => "HUR",
                 "zi" or "zile" => "DAY",
                 "luna" or "luni" => "MON",
-                _ => "H87"
+                _ => "EA"
             };
         }
 

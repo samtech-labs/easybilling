@@ -34,7 +34,11 @@ namespace EasyBilling.Application.Services
                 CUI = cleanCui,
                 Address = anafDetails.RegisteredAddress?.FormattedAddress,
                 County = anafDetails.RegisteredAddress?.County,
-                RegNumber = anafDetails.RegistrationNumber
+                City = anafDetails.RegisteredAddress?.City,
+                Country = anafDetails.RegisteredAddress?.Country,
+                RegNumber = anafDetails.RegistrationNumber,
+                IsVatPayer = anafDetails.IsVatPayer,
+                IsEFacturaActive = anafDetails.IsEFacturaActive
             };
 
             return companyResponse;
@@ -74,9 +78,13 @@ namespace EasyBilling.Application.Services
                 CUI = cleanCui,
                 Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createCompanyRequest.Address,
                 County = anafDetails?.RegisteredAddress?.County ?? createCompanyRequest.County,
+                City = anafDetails?.RegisteredAddress?.City ?? createCompanyRequest.City,
+                Country = anafDetails?.RegisteredAddress?.Country ?? createCompanyRequest.Country,
                 RegNumber = anafDetails?.RegistrationNumber ?? createCompanyRequest.RegNumber,
                 IBAN = createCompanyRequest.IBAN,
                 Bank = createCompanyRequest.Bank,
+                IsVatPayer = createCompanyRequest.IsVatPayer ?? anafDetails?.IsVatPayer ?? false,
+                IsEFacturaActive = createCompanyRequest.IsEFacturaActive ?? anafDetails?.IsEFacturaActive ?? false,
                 UserId = _currentUserService.UserId
             };
 

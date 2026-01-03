@@ -9,9 +9,10 @@ namespace EasyBilling.Infrastructure.Persistence
         {
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
-            // Connection string for design-time operations (migrations).
-            // This is used by EF Core tools when running migrations.
-            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=easybilling-dev;Username=postgres;Password=postgres");
+            // Dummy connection string for design-time operations (migrations bundle creation).
+            // EF Core only needs to understand the model schema - it doesn't connect to the DB.
+            // At runtime, the actual connection string is passed via --connection argument.
+            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=easybilling-dev;Username=postgres;Password=postgres;");
 
             return new AppDbContext(optionsBuilder.Options);
         }

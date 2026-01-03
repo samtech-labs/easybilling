@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251226133438_AddExtraDetailsToCompany")]
+    partial class AddExtraDetailsToCompany
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,43 +24,6 @@ namespace EasyBilling.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.AnafToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AccessToken")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("AccessTokenExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RefreshToken")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RefreshTokenExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("AnafTokens");
-                });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Client", b =>
                 {
@@ -75,14 +41,8 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("City")
-                        .HasColumnType("text");
-
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Country")
-                        .HasColumnType("text");
 
                     b.Property<string>("County")
                         .HasColumnType("text");
@@ -220,59 +180,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.ToTable("Invoices");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceAnafSubmission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DownloadId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("LastCheckedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("integer");
-
-                    b.Property<byte[]>("SentXml")
-                        .HasColumnType("bytea");
-
-                    b.Property<byte[]>("SignedXml")
-                        .HasColumnType("bytea");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("UploadIndex")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("Status", "LastCheckedAt");
-
-                    b.ToTable("InvoiceAnafSubmissions", (string)null);
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -345,17 +252,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.AnafToken", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.User", "User")
-                        .WithOne("AnafToken")
-                        .HasForeignKey("EasyBilling.Domain.Models.AnafToken", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.Client", b =>
                 {
                     b.HasOne("EasyBilling.Domain.Models.Company", "Company")
@@ -397,17 +293,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("Company");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceAnafSubmission", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.Invoice", "Invoice")
-                        .WithMany("AnafSubmissions")
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Invoice");
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
                 {
                     b.HasOne("EasyBilling.Domain.Models.Invoice", "Invoice")
@@ -426,15 +311,11 @@ namespace EasyBilling.Infrastructure.Migrations
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
                 {
-                    b.Navigation("AnafSubmissions");
-
                     b.Navigation("InvoiceLines");
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
                 {
-                    b.Navigation("AnafToken");
-
                     b.Navigation("Companies");
                 });
 #pragma warning restore 612, 618

@@ -5,6 +5,7 @@ using EasyBilling.Domain.Models;
 using Hangfire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.IO.Compression;
 using System.Xml.Linq;
 
 namespace EasyBilling.Application.Jobs
@@ -19,6 +20,7 @@ namespace EasyBilling.Application.Jobs
         private readonly string _baseUrl;
 
         private const int MaxRetries = 20;
+        private const int MaxTechnicalErrorRetries = 5;
 
         public AnafStatusCheckJob(
             IInvoiceAnafSubmissionRepository submissionRepository,
@@ -76,6 +78,27 @@ namespace EasyBilling.Application.Jobs
                 submission.LastCheckedAt = DateTime.UtcNow;
                 submission.RetryCount++;
 
+                // Eroare tehnică - retry limitat
+                if (result.IsTechnicalError)
+                {
+                    _logger.LogWarning("Technical error from ANAF for {SubmissionId}: {Error}",
+                        submissionId, result.ErrorMessage);
+
+                    if (submission.RetryCount < MaxTechnicalErrorRetries)
+                    {
+                        submission.Status = AnafSubmissionStatus.Processing;
+                        ScheduleRetry(submissionId, submission.RetryCount);
+                    }
+                    else
+                    {
+                        submission.Status = AnafSubmissionStatus.Error;
+                        submission.ErrorMessage = result.ErrorMessage ?? "Technical error from ANAF";
+                    }
+
+                    await _submissionRepository.SaveChangesAsync();
+                    return;
+                }
+
                 switch (result.Stare)
                 {
                     case "ok":
@@ -83,7 +106,7 @@ namespace EasyBilling.Application.Jobs
                         break;
 
                     case "nok":
-                        await HandleErrorAsync(submission, result.IdDescarcare, token.AccessToken);  // ← acum e async
+                        await HandleErrorAsync(submission, result.IdDescarcare, token.AccessToken);
                         break;
 
                     default:
@@ -122,7 +145,6 @@ namespace EasyBilling.Application.Jobs
             var response = await client.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
 
-            // DEBUG - vezi exact ce primești
             _logger.LogInformation("=== ANAF Status Response ===");
             _logger.LogInformation("URL: {Url}", url);
             _logger.LogInformation("Status: {Status}", response.StatusCode);
@@ -132,102 +154,46 @@ namespace EasyBilling.Application.Jobs
             var doc = XDocument.Parse(content);
             var header = doc.Root;
 
+            var stare = header?.Attribute("stare")?.Value;
+            var idDescarcare = header?.Attribute("id_descarcare")?.Value;
+
+            // Extrage erori
+            var errorMessages = new List<string>();
+
+            var errorElements = header?.Descendants()
+                .Where(e => e.Name.LocalName == "Error" || e.Name.LocalName == "Errors")
+                .ToList() ?? [];
+
+            foreach (var error in errorElements)
+            {
+                var errorMsg = error.Attribute("errorMessage")?.Value;
+                if (!string.IsNullOrEmpty(errorMsg))
+                    errorMessages.Add(errorMsg);
+
+                if (!string.IsNullOrWhiteSpace(error.Value))
+                    errorMessages.Add(error.Value);
+            }
+
+            // Detectează eroare tehnică
+            var isTechnicalError = errorMessages.Any(e =>
+                e.Contains("eroare tehnica", StringComparison.OrdinalIgnoreCase) ||
+                e.Contains("Cod: 4001") ||
+                e.Contains("Cod: 4002") ||
+                e.Contains("Cod: 5001"));
+
+            // Dacă avem erori dar nu avem stare, e eroare
+            if (string.IsNullOrEmpty(stare) && errorMessages.Any())
+            {
+                stare = isTechnicalError ? "technical_error" : "nok";
+            }
+
             return new StatusResult
             {
-                Stare = header?.Attribute("stare")?.Value ?? "in prelucrare",
-                IdDescarcare = header?.Attribute("id_descarcare")?.Value,
-                ErrorMessage = string.Join("; ", header?.Descendants("Error").Select(e => e.Value) ?? [])
+                Stare = stare ?? "in prelucrare",
+                IdDescarcare = idDescarcare,
+                ErrorMessage = errorMessages.Any() ? string.Join("; ", errorMessages.Distinct()) : null,
+                IsTechnicalError = isTechnicalError
             };
-        }
-
-        private async Task HandleErrorAsync(InvoiceAnafSubmission submission, string? idDescarcare, string accessToken)
-        {
-            submission.Status = AnafSubmissionStatus.Error;
-            submission.DownloadId = idDescarcare;
-
-            // Descarcă ZIP-ul cu erorile
-            if (!string.IsNullOrEmpty(idDescarcare))
-            {
-                try
-                {
-                    var client = _anafHelper.CreateAuthenticatedClient(accessToken);
-                    var url = $"{_baseUrl}/descarcare?id={idDescarcare}";
-
-                    var response = await client.GetAsync(url);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var zipBytes = await response.Content.ReadAsByteArrayAsync();
-                        submission.SignedXml = zipBytes;
-
-                        // Extrage și loghează erorile din ZIP
-                        var errors = ExtractErrorsFromZip(zipBytes);
-                        submission.ErrorMessage = errors;
-
-                        _logger.LogWarning("✗ Invoice {InvoiceId} rejected by ANAF: {Errors}",
-                            submission.InvoiceId, errors);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to download error details");
-                    submission.ErrorMessage = "Failed to download error details from ANAF";
-                }
-            }
-            else
-            {
-                submission.ErrorMessage = "Unknown error from ANAF";
-            }
-        }
-
-        private string ExtractErrorsFromZip(byte[] zipBytes)
-        {
-            try
-            {
-                using var zipStream = new MemoryStream(zipBytes);
-                using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
-
-                foreach (var entry in archive.Entries)
-                {
-                    // Caută fișierul cu erori (de obicei are "errors" în nume sau e XML-ul principal)
-                    if (entry.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-                    {
-                        using var entryStream = entry.Open();
-                        using var reader = new StreamReader(entryStream);
-                        var content = reader.ReadToEnd();
-
-                        _logger.LogInformation("ZIP entry {Name}: {Content}", entry.Name, content);
-
-                        // Încearcă să extragi mesajele de eroare din XML
-                        try
-                        {
-                            var doc = XDocument.Parse(content);
-                            var errors = doc.Descendants()
-                                .Where(e => e.Name.LocalName.Contains("Error") ||
-                                           e.Name.LocalName.Contains("Description") ||
-                                           e.Name.LocalName.Contains("Text"))
-                                .Select(e => e.Value)
-                                .Where(v => !string.IsNullOrWhiteSpace(v))
-                                .ToList();
-
-                            if (errors.Any())
-                                return string.Join("; ", errors);
-                        }
-                        catch
-                        {
-                            // Nu e XML valid, returnează raw content (truncat)
-                            return content.Length > 2000 ? content[..2000] : content;
-                        }
-                    }
-                }
-
-                return "Error details not found in ANAF response";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to extract errors from ZIP");
-                return $"Failed to parse error response: {ex.Message}";
-            }
         }
 
         private async Task HandleSuccessAsync(InvoiceAnafSubmission submission, string? idDescarcare, string accessToken)
@@ -259,13 +225,90 @@ namespace EasyBilling.Application.Jobs
             }
         }
 
-        private void HandleError(InvoiceAnafSubmission submission, string? errorMessage)
+        private async Task HandleErrorAsync(InvoiceAnafSubmission submission, string? idDescarcare, string accessToken)
         {
             submission.Status = AnafSubmissionStatus.Error;
-            submission.ErrorMessage = errorMessage ?? "Unknown error from ANAF";
+            submission.DownloadId = idDescarcare;
 
-            _logger.LogWarning("✗ Invoice {InvoiceId} rejected: {Error}",
-                submission.InvoiceId, errorMessage);
+            if (!string.IsNullOrEmpty(idDescarcare))
+            {
+                try
+                {
+                    var client = _anafHelper.CreateAuthenticatedClient(accessToken);
+                    var url = $"{_baseUrl}/descarcare?id={idDescarcare}";
+
+                    var response = await client.GetAsync(url);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var zipBytes = await response.Content.ReadAsByteArrayAsync();
+                        submission.SignedXml = zipBytes;
+
+                        var errors = ExtractErrorsFromZip(zipBytes);
+                        submission.ErrorMessage = errors;
+
+                        _logger.LogWarning("✗ Invoice {InvoiceId} rejected by ANAF: {Errors}",
+                            submission.InvoiceId, errors);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to download error details");
+                    submission.ErrorMessage = "Failed to download error details from ANAF";
+                }
+            }
+            else
+            {
+                submission.ErrorMessage = "Unknown error from ANAF";
+            }
+        }
+
+        private string ExtractErrorsFromZip(byte[] zipBytes)
+        {
+            try
+            {
+                using var zipStream = new MemoryStream(zipBytes);
+                using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var entryStream = entry.Open();
+                        using var reader = new StreamReader(entryStream);
+                        var content = reader.ReadToEnd();
+
+                        _logger.LogDebug("ZIP entry {Name}: {Content}", entry.Name, content);
+
+                        try
+                        {
+                            var doc = XDocument.Parse(content);
+
+                            // Caută atribute errorMessage pe elemente Error
+                            var errors = doc.Descendants()
+                                .Where(e => e.Name.LocalName.Contains("Error"))
+                                .Select(e => e.Attribute("errorMessage")?.Value ?? e.Value)
+                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                .Distinct()
+                                .ToList();
+
+                            if (errors.Any())
+                                return string.Join("; ", errors);
+                        }
+                        catch
+                        {
+                            return content.Length > 2000 ? content[..2000] : content;
+                        }
+                    }
+                }
+
+                return "Error details not found in ANAF response";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to extract errors from ZIP");
+                return $"Failed to parse error response: {ex.Message}";
+            }
         }
 
         private void HandlePending(InvoiceAnafSubmission submission)
@@ -305,6 +348,7 @@ namespace EasyBilling.Application.Jobs
             public string Stare { get; set; } = "";
             public string? IdDescarcare { get; set; }
             public string? ErrorMessage { get; set; }
+            public bool IsTechnicalError { get; set; }
         }
     }
 }
