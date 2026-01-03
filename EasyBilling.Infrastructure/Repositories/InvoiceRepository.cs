@@ -39,5 +39,25 @@ namespace EasyBilling.Infrastructure.Repositories
             await _db.Invoices.AddAsync(invoice);
             await _db.SaveChangesAsync();
         }
+
+        public async Task UploadInvoicePdfBlobAsync(InvoiceBlob blob, CancellationToken ct = default)
+        {
+            var existing = await _db.InvoiceBlobs
+                .FirstOrDefaultAsync(x => x.InvoiceId == blob.InvoiceId, ct);
+
+            if (existing == null)
+            {
+                blob.UploadedAtUtc = DateTime.UtcNow;
+                _db.InvoiceBlobs.Add(blob);
+            }
+            else
+            {
+                existing.ContainerName = blob.ContainerName;
+                existing.BlobName = blob.BlobName;
+                existing.UploadedAtUtc = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
     }
 }

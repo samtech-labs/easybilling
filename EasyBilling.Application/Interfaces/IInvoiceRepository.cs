@@ -8,5 +8,7 @@ namespace EasyBilling.Application.Interfaces
         Task<Invoice?> GetByIdWithDetailsAsync(Guid invoiceId);
         Task<List<Invoice>> GetAllByCompanyIdAsync(Guid companyId);
         Task AddAsync(Invoice invoice);
+        Task UploadInvoicePdfBlobAsync(InvoiceBlob blob, CancellationToken ct = default);
+
     }
 }

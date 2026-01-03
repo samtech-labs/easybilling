@@ -18,7 +18,7 @@ namespace EasyBilling.Application.Services
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
         private readonly ICompanyService _companyService = companyService;
         private readonly IClientRepository _clientRepository = clientRepository;
-        private readonly BlobStorageService _blobStorageService;
+        private readonly BlobStorageService _blobStorageService = blobStorageService;
         private const int MaxInvoiceLines = 5;
 
         public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request)
@@ -375,7 +375,14 @@ namespace EasyBilling.Application.Services
             
             try
             {
-                await _blobStorageService.UploadFileToBlob(invoiceId, pdfBytes);
+                var (container, blobName) = await _blobStorageService.UploadFileToBlob(invoiceId, pdfBytes);
+                await _invoiceRepository.UploadInvoicePdfBlobAsync(new InvoiceBlob
+                {
+                    InvoiceId = invoiceId,
+                    ContainerName = container,
+                    BlobName = blobName,
+                    UploadedAtUtc = DateTime.UtcNow
+                });
             }
             catch (Azure.RequestFailedException ex)
             {

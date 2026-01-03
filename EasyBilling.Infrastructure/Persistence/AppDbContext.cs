@@ -11,6 +11,7 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<User> Users { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<InvoiceBlob> InvoiceBlobs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,7 +37,21 @@ namespace EasyBilling.Infrastructure.Persistence
                 .HasForeignKey(il => il.InvoiceId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
+            
+            modelBuilder.Entity<InvoiceBlob>(e =>
+            {
+                e.HasKey(x => x.InvoiceId);
 
+                e.Property(x => x.ContainerName).IsRequired();
+                e.Property(x => x.BlobName).IsRequired();
+
+                e.HasOne(x => x.Invoice)
+                    .WithOne() 
+                    .HasForeignKey<InvoiceBlob>(x => x.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            
             modelBuilder.Entity<User>().HasData(
                 new User
                 {

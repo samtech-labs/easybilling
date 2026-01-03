@@ -2,7 +2,6 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using EasyBilling.Application.Interfaces;
-using EasyBilling.Application.IServices;
 using EasyBilling.Domain.Models;
 using Microsoft.Extensions.Configuration;
 
@@ -25,7 +24,7 @@ public class BlobStorageService
         _blobContainer = blobServiceClient.GetBlobContainerClient(containerName);
     }
 
-    public async Task UploadFileToBlob(Guid invoiceId, byte[] pdfbytes, CancellationToken ct = default)
+    public async Task<(string container, string blobName)> UploadFileToBlob(Guid invoiceId, byte[] pdfbytes, CancellationToken ct = default)
     {
         if (pdfbytes == null || pdfbytes.Length == 0)
         {
@@ -50,6 +49,7 @@ public class BlobStorageService
         try
         {
             await blob.UploadAsync(stream, options, cancellationToken: ct);
+            return (_blobContainer.Name, blobName);
         }
         catch (OperationCanceledException)
         {
