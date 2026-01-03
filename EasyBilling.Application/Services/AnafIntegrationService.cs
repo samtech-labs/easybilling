@@ -100,7 +100,6 @@ namespace EasyBilling.Application.Services
             var cui = invoice.Company.CUI;
             cui = cui.StartsWith("RO") ? cui[2..] : cui;
 
-            // debug
             var uploadIndex = await UploadXmlAsync(xml, cui, token!.AccessToken, cancellationToken);
 
             var invoiceAnafSubmission = new InvoiceAnafSubmission

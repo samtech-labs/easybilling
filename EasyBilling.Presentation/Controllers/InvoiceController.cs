@@ -77,6 +77,25 @@ namespace EasyBilling.Presentation.Controllers
         }
 
         [HttpGet]
+        [Route("GetLastInvoiceNumber")]
+        public async Task<IActionResult> GetLastInvoiceNumber(Guid companyId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var lastInvoiceNumber = await _invoiceService.GetLastInvoiceNumberAsync(companyId, cancellationToken);
+                return Ok(lastInvoiceNumber);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the last invoice number.");
+            }
+        }
+
+        [HttpGet]
         [Route("GeneratePdf")]
         public async Task<IActionResult> GeneratePdf(Guid invoiceId, CancellationToken cancellationToken)
         {

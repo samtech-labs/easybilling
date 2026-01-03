@@ -38,10 +38,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         private XElement CreateInvoiceElement(Invoice invoice)
         {
             var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
-
-            // DueDate - dacă nu e setat, folosește IssueDate
-            //  var dueDate = invoice.DueDate ?? invoice.Date;
-            var dueDate = invoice.Date;
+            var dueDate = invoice.DueDate ?? invoice.Date;
 
             var invoiceElement = new XElement(NS_INVOICE + "Invoice",
                 new XAttribute(XNamespace.Xmlns + "cac", NS_CAC),

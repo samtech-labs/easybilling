@@ -120,6 +120,29 @@ namespace EasyBilling.Application.Services
                 totalVat += lineVat;
             }
 
+            // Validate series and number
+            if (string.IsNullOrWhiteSpace(request.Series))
+            {
+                throw new InvalidOperationException("Invoice series is required.");
+            }
+
+            if (request.Number <= 0)
+            {
+                throw new InvalidOperationException("Invoice number must be greater than 0.");
+            }
+
+            // Check if there's a previous invoice with the same series
+            var lastInvoiceWithSeries = await _invoiceRepository.GetLastInvoiceBySeriesAsync(companyId, request.Series, cancellationToken);
+
+            if (lastInvoiceWithSeries != null)
+            {
+                // Ensure the new number is greater than the last one for this series
+                if (request.Number <= lastInvoiceWithSeries.Number)
+                {
+                    throw new InvalidOperationException($"Invoice number must be greater than {lastInvoiceWithSeries.Number} for series '{request.Series}'.");
+                }
+            }
+
             // Create invoice
             var invoiceId = Guid.NewGuid();
             var invoiceDate = request.Date ?? request.IssueDate ?? DateTime.UtcNow;
@@ -134,12 +157,28 @@ namespace EasyBilling.Application.Services
                 invoiceDate = invoiceDate.ToUniversalTime();
             }
 
+            // Handle DueDate if provided
+            DateTime? dueDate = null;
+            if (request.DueDate.HasValue)
+            {
+                dueDate = request.DueDate.Value;
+                if (dueDate.Value.Kind == DateTimeKind.Unspecified)
+                {
+                    dueDate = DateTime.SpecifyKind(dueDate.Value, DateTimeKind.Utc);
+                }
+                else if (dueDate.Value.Kind == DateTimeKind.Local)
+                {
+                    dueDate = dueDate.Value.ToUniversalTime();
+                }
+            }
+
             var invoice = new Invoice
             {
                 Id = invoiceId,
                 Date = invoiceDate,
-                Series = request.Series ?? "INV",
-                Number = request.Number ?? 1,
+                DueDate = dueDate,
+                Series = request.Series,
+                Number = request.Number,
                 TotalAmount = totalAmount,
                 Vat = totalVat,
                 CompanyId = companyId,
@@ -167,6 +206,7 @@ namespace EasyBilling.Application.Services
             {
                 Id = invoice.Id,
                 Date = invoice.Date,
+                DueDate = invoice.DueDate,
                 Series = invoice.Series,
                 Number = invoice.Number,
                 TotalAmount = totalAmount,
@@ -229,6 +269,26 @@ namespace EasyBilling.Application.Services
             var invoices = await _invoiceRepository.GetAllByCompanyIdAsync(companyId, cancellationToken);
 
             return invoices.Select(MapInvoiceToDto).ToList();
+        }
+
+        public async Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var lastInvoice = await _invoiceRepository.GetLastInvoiceByCompanyIdAsync(companyId, cancellationToken);
+
+            var lastInvoiceNumber = lastInvoice?.Number ?? 1;
+            var lastInvoiceSeries = lastInvoice?.Series ?? "A";
+
+            return new LastInvoiceNumberDto
+            {
+                Series = lastInvoiceSeries,
+                Number = lastInvoiceNumber
+            };
         }
 
         public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default)
@@ -422,6 +482,7 @@ namespace EasyBilling.Application.Services
             {
                 Id = invoice.Id,
                 Date = invoice.Date,
+                DueDate = invoice.DueDate,
                 Series = invoice.Series,
                 Number = invoice.Number,
                 TotalAmount = totalAmount,

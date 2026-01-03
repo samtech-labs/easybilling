@@ -5,7 +5,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
     public static class LocationHelper
     {
         /// <summary>
-        /// Returnează toate județele din România
+        /// Returns all counties from Romania
         /// </summary>
         public static List<CountyDto> GetCounties()
         {
@@ -13,7 +13,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         }
 
         /// <summary>
-        /// Returnează orașele, opțional filtrate pe județ
+        /// Returns all cities from Romania, optionally filtered by county code
         /// </summary>
         public static List<CityDto> GetCities(string? countyCode = null)
         {
@@ -28,12 +28,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         }
 
         /// <summary>
-        /// Normalizează numele orașului
-        /// "Mun. Târgu Jiu" => "Târgu Jiu"
-        /// "Sector 1 Mun. București" => "Sector 1"
-        /// </summary>
-        /// <summary>
-        /// Normalizează numele orașului
+        /// Normalize the city name by removing common prefixes
         /// "Mun. Târgu Jiu" => "Târgu Jiu"
         /// "Sector 1 Mun. București" => "SECTOR1"
         /// </summary>
@@ -44,7 +39,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
 
             var clean = city.Trim();
 
-            // Dacă conține "Sector" - returnează în formatul ANAF: SECTOR1, SECTOR2, etc.
+            // If it contains "Sector" - return in ANAF format: SECTOR1, SECTOR2, etc.
             if (clean.Contains("Sector", StringComparison.OrdinalIgnoreCase))
             {
                 var match = Regex.Match(clean, @"Sector\s*(\d)", RegexOptions.IgnoreCase);
@@ -52,7 +47,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
                     return $"SECTOR{match.Groups[1].Value}";  // SECTOR1, SECTOR2, etc.
             }
 
-            // Elimină prefixele comune
+            // Remove common prefixes
             var prefixes = new[] { "Mun.", "Municipiul", "Oraș", "Oras", "Com.", "Comuna", "Sat" };
 
             foreach (var prefix in prefixes)
@@ -63,7 +58,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
                 }
             }
 
-            // Elimină și din mijloc (ex: "Târgu Jiu Mun." -> "Târgu Jiu")
+            // Removes any occurrence of the prefixes within the string
             foreach (var prefix in prefixes)
             {
                 var pattern = $@"\s*{Regex.Escape(prefix)}\.?\s*\S*";
@@ -74,7 +69,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         }
 
         /// <summary>
-        /// Convertește județul în cod ISO, inclusiv formate speciale
+        /// Converts the county name to its ISO code
         /// "MUNICIPIUL BUCUREȘTI" => "RO-B"
         /// "Gorj" => "RO-GJ"
         /// </summary>
@@ -85,22 +80,19 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
 
             var clean = countyName.Trim().ToUpper();
 
-            // Deja în format ISO
+            // Already in ISO code format
             if (clean.StartsWith("RO-"))
                 return clean;
 
-            // Normalizează - elimină prefixe
             clean = clean
                 .Replace("MUNICIPIUL", "")
                 .Replace("JUDEȚUL", "")
                 .Replace("JUDETUL", "")
                 .Trim();
 
-            // Caută în mapping
             if (CountyNameToCode.TryGetValue(clean, out var code))
                 return code;
 
-            // Încearcă fără diacritice
             var normalized = RemoveDiacritics(clean);
             if (CountyNameToCode.TryGetValue(normalized, out code))
                 return code;
@@ -109,7 +101,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         }
 
         /// <summary>
-        /// Convertește codul ISO în numele județului
+        /// Converts the county ISO code to its name
         /// "RO-GJ" => "Gorj"
         /// </summary>
         public static string? GetCountyName(string? countyCode)

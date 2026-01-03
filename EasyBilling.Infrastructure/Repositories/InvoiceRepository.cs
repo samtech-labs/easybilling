@@ -34,6 +34,23 @@ namespace EasyBilling.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<Invoice?> GetLastInvoiceByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
+        {
+            return await _db.Invoices
+                .Where(i => i.CompanyId == companyId)
+                .OrderByDescending(i => i.Date)
+                .ThenByDescending(i => i.Number)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<Invoice?> GetLastInvoiceBySeriesAsync(Guid companyId, string series, CancellationToken cancellationToken = default)
+        {
+            return await _db.Invoices
+                .Where(i => i.CompanyId == companyId && i.Series == series)
+                .OrderByDescending(i => i.Number)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public async Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default)
         {
             await _db.Invoices.AddAsync(invoice, cancellationToken);
