@@ -1,4 +1,4 @@
-﻿using EasyBilling.Application.Interfaces;
+﻿using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

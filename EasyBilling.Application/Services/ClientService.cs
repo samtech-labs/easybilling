@@ -1,4 +1,5 @@
-﻿using EasyBilling.Application.Interfaces;
+﻿using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 
@@ -55,6 +56,8 @@ namespace EasyBilling.Application.Services
                 CUI = cleanCui,
                 Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createClientRequest.Address,
                 County = anafDetails?.RegisteredAddress?.County ?? createClientRequest.County,
+                City = anafDetails?.RegisteredAddress?.City ?? createClientRequest.City,
+                Country = anafDetails?.RegisteredAddress?.Country ?? createClientRequest.Country,
                 RegNumber = anafDetails?.RegistrationNumber ?? createClientRequest.RegNumber,
                 IBAN = createClientRequest.IBAN,
                 Bank = createClientRequest.Bank

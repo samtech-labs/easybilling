@@ -1,7 +1,8 @@
-using EasyBilling.Application.Interfaces;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 using EasyBilling.Application.Dtos;
+using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Application.Interfaces.Repositories;
 
 namespace EasyBilling.Application.Services
 {
@@ -33,7 +34,11 @@ namespace EasyBilling.Application.Services
                 CUI = cleanCui,
                 Address = anafDetails.RegisteredAddress?.FormattedAddress,
                 County = anafDetails.RegisteredAddress?.County,
-                RegNumber = anafDetails.RegistrationNumber
+                City = anafDetails.RegisteredAddress?.City,
+                Country = anafDetails.RegisteredAddress?.Country,
+                RegNumber = anafDetails.RegistrationNumber,
+                IsVatPayer = anafDetails.IsVatPayer,
+                IsEFacturaActive = anafDetails.IsEFacturaActive
             };
 
             return companyResponse;
@@ -73,9 +78,13 @@ namespace EasyBilling.Application.Services
                 CUI = cleanCui,
                 Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createCompanyRequest.Address,
                 County = anafDetails?.RegisteredAddress?.County ?? createCompanyRequest.County,
+                City = anafDetails?.RegisteredAddress?.City ?? createCompanyRequest.City,
+                Country = anafDetails?.RegisteredAddress?.Country ?? createCompanyRequest.Country,
                 RegNumber = anafDetails?.RegistrationNumber ?? createCompanyRequest.RegNumber,
                 IBAN = createCompanyRequest.IBAN,
                 Bank = createCompanyRequest.Bank,
+                IsVatPayer = createCompanyRequest.IsVatPayer ?? anafDetails?.IsVatPayer ?? false,
+                IsEFacturaActive = createCompanyRequest.IsEFacturaActive ?? anafDetails?.IsEFacturaActive ?? false,
                 UserId = _currentUserService.UserId
             };
 
@@ -83,9 +92,9 @@ namespace EasyBilling.Application.Services
             return company;
         }
 
-        public async Task<Company?> GetCompanyByIdAsync(Guid companyId)
+        public async Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
-            return await _companyRepository.GetByIdAsync(companyId);
+            return await _companyRepository.GetByIdAsync(companyId, cancellationToken);
         }
 
         public async Task DeleteCompanyAsync(Guid companyId)
@@ -103,6 +112,12 @@ namespace EasyBilling.Application.Services
             }
 
             await _companyRepository.DeleteAsync(company);
+        }
+
+        public async Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default)
+        {
+            var cleanCif = cif.Replace("RO", "").Replace(" ", "").Trim();
+            return await _companyRepository.GetByCuiAsync(cleanCif, _currentUserService.UserId, cancellationToken);
         }
     }
 }

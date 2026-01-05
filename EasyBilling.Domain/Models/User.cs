@@ -7,5 +7,6 @@ public class User
     public required string Email { get; set; }
 
     public List<Company>? Companies { get; set; } = new List<Company>();
+    public AnafToken? AnafToken { get; set; }
 
 }
