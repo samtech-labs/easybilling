@@ -114,7 +114,7 @@ namespace EasyBilling.Presentation.Controllers
             }
         }
 
-        [HttpGet]
+        [HttpPost]
         [Route("SendEFactura")]
         public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
         {

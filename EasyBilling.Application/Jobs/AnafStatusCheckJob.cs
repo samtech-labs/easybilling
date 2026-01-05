@@ -20,7 +20,6 @@ namespace EasyBilling.Application.Jobs
         private readonly string _baseUrl;
 
         private const int MaxRetries = 20;
-        private const int MaxTechnicalErrorRetries = 5; // this should be pinged only once
 
         public AnafStatusCheckJob(
             IInvoiceAnafSubmissionRepository submissionRepository,
@@ -78,22 +77,12 @@ namespace EasyBilling.Application.Jobs
                 submission.LastCheckedAt = DateTime.UtcNow;
                 submission.RetryCount++;
 
-                // Eroare tehnică - retry limitat
                 if (result.IsTechnicalError)
                 {
-                    _logger.LogWarning("Technical error from ANAF for {SubmissionId}: {Error}",
-                        submissionId, result.ErrorMessage);
+                    _logger.LogWarning("Technical error from ANAF for {SubmissionId}: {Error}", submissionId, result.ErrorMessage);
 
-                    if (submission.RetryCount < MaxTechnicalErrorRetries)
-                    {
-                        submission.Status = AnafSubmissionStatus.Processing;
-                        ScheduleRetry(submissionId, submission.RetryCount);
-                    }
-                    else
-                    {
-                        submission.Status = AnafSubmissionStatus.Error;
-                        submission.ErrorMessage = result.ErrorMessage ?? "Technical error from ANAF";
-                    }
+                    submission.Status = AnafSubmissionStatus.Error;
+                    submission.ErrorMessage = result.ErrorMessage ?? "Technical error from ANAF";
 
                     await _submissionRepository.SaveChangesAsync();
                     return;

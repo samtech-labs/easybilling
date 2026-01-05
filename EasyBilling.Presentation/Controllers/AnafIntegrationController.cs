@@ -1,8 +1,11 @@
 ﻿using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.DotNet.Scaffolding.Shared;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
@@ -15,12 +18,14 @@ namespace EasyBilling.Presentation.Controllers
         IConfiguration config,
         ICurrentUserService currentUserService,
         IAnafIntegrationService anafIntegrationService,
-        IHttpClientFactory httpClientFactory) : ControllerBase
+        IHttpClientFactory httpClientFactory,
+        IDataProtectionProvider dataProtectionProvider) : ControllerBase
     {
         private readonly IConfiguration _config = config;
         private readonly ICurrentUserService _currentUserService = currentUserService;
         private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
         private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+        private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("Anaf.OAuth.State");
 
         [HttpGet("authorize")]
         [Authorize]
@@ -33,8 +38,7 @@ namespace EasyBilling.Presentation.Controllers
                 return Unauthorized();
             }
 
-            var state = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes(userId.ToString()));
+            var state = _protector.Protect(userId.ToString());
 
             var queryParams = HttpUtility.ParseQueryString(string.Empty);
             queryParams["response_type"] = "code";
@@ -60,12 +64,12 @@ namespace EasyBilling.Presentation.Controllers
             Guid userId;
             try
             {
-                var userIdString = Encoding.UTF8.GetString(Convert.FromBase64String(state));
-                userId = Guid.Parse(userIdString);
+                var decrypted = _protector.Unprotect(state);
+                userId = Guid.Parse(decrypted);
             }
-            catch
+            catch (CryptographicException)
             {
-                return CallbackError("Invalid state parameter");
+                return BadRequest("Invalid or tampered state");
             }
 
             var clientId = _config["Anaf:ClientId"];
