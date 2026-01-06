@@ -13,6 +13,7 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<AnafToken> AnafTokens { get; set; }
         public DbSet<InvoiceAnafSubmission> InvoiceAnafSubmissions { get; set; }
+        public DbSet<InvoiceBlob> InvoiceBlobs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -72,6 +73,26 @@ namespace EasyBilling.Infrastructure.Persistence
                 entity.HasIndex(e => e.InvoiceId);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => new { e.Status, e.LastCheckedAt });
+            });
+
+            modelBuilder.Entity<InvoiceBlob>(entity =>
+            {
+                entity.ToTable("InvoiceBlobs");
+                entity.HasKey(e => e.InvoiceId);
+
+                entity.Property(x => x.ContainerName)
+                    .IsRequired();
+
+                entity.Property(x => x.BlobName)
+                    .IsRequired();
+                
+                entity.Property(e => e.UploadedAtUtc)
+                    .IsRequired();
+
+                entity.HasOne<Invoice>()
+                    .WithOne()
+                    .HasForeignKey<InvoiceBlob>(x => x.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<User>().HasData(

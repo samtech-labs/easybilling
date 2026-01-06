@@ -12,7 +12,7 @@ namespace EasyBilling.Infrastructure.Persistence
             // Dummy connection string for design-time operations (migrations bundle creation).
             // EF Core only needs to understand the model schema - it doesn't connect to the DB.
             // At runtime, the actual connection string is passed via --connection argument.
-            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=easybilling-dev;Username=postgres;Password=postgres;");
+            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=easybilling-dev2;Username=dragosmihai;Password=dragos123;");
 
             return new AppDbContext(optionsBuilder.Options);
         }

@@ -16,5 +16,6 @@ namespace EasyBilling.Application.Interfaces.Services
         Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task<byte[]> GetStoredInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default);
     }
 }

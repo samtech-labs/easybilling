@@ -56,5 +56,18 @@ namespace EasyBilling.Infrastructure.Repositories
             await _db.Invoices.AddAsync(invoice, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task<InvoiceBlob?> GetInvoiceBlobByIdAsync(Guid invoiceId, CancellationToken ct = default)
+        {
+            return await _db.Set<InvoiceBlob>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.InvoiceId == invoiceId, ct);
+        }
+        
+        public async Task SaveInvoiceBlobAsync(InvoiceBlob blob, CancellationToken ct = default)
+        {
+            _db.Set<InvoiceBlob>().Add(blob);
+            await _db.SaveChangesAsync(ct);
+        }
     }
 }

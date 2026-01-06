@@ -113,6 +113,32 @@ namespace EasyBilling.Presentation.Controllers
                 return StatusCode(500, "An error occurred while generating the invoice PDF.");
             }
         }
+        
+        [HttpGet]
+        [Route("GetUploadedInvoice")]
+        public async Task<IActionResult> GetUploadedInvoice(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var pdfBytes = await _invoiceService.GetStoredInvoicePdfAsync(invoiceId, cancellationToken);
+                
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                var fileName = invoice != null
+                    ? $"Factura_{invoice.Series}_{invoice.Number}.pdf"
+                    : "invoice.pdf";
+
+                return File(pdfBytes, "application/pdf", fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while downloading the stored invoice PDF.");
+            }
+        }
+
 
         [HttpPost]
         [Route("SendEFactura")]

@@ -10,5 +10,7 @@ namespace EasyBilling.Application.Interfaces.Repositories
         Task<Invoice?> GetLastInvoiceByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task<Invoice?> GetLastInvoiceBySeriesAsync(Guid companyId, string series, CancellationToken cancellationToken = default);
         Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default);
+        Task<InvoiceBlob?> GetInvoiceBlobByIdAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task SaveInvoiceBlobAsync(InvoiceBlob blob, CancellationToken cancellationToken = default);
     }
 }
