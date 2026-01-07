@@ -26,9 +26,14 @@ builder.Configuration
 
 // Add services to the container.
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection1")));
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+
+var jwtKey = jwtSettings["Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("Missing configuration value: JwtSettings:Key");
+
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
 builder.Services

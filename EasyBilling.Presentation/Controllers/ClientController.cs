@@ -30,6 +30,27 @@ namespace EasyBilling.Presentation.Controllers
                 return StatusCode(500, "An error occurred while retrieving clients.");
             }
         }
+        
+        [HttpGet]
+        [Route("GetAllClientsPaged")]
+        public async Task<IActionResult> GetClientsPaged(Guid companyId, [FromQuery] int page, int pageSize, 
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var clients = await _clientService.GetClientsByCompanyIdPagedAsync(companyId,
+                     new PageRequest{Page = page, PageSize = pageSize}, cancellationToken);
+                return Ok(clients);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving clients.");
+            }
+        }
 
         [HttpPost]
         [Route("CreateClient")]

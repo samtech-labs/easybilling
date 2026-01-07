@@ -3,6 +3,7 @@ using EasyBilling.Domain.Models;
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Responses;
 
 namespace EasyBilling.Application.Services
 {
@@ -118,6 +119,41 @@ namespace EasyBilling.Application.Services
         {
             var cleanCif = cif.Replace("RO", "").Replace(" ", "").Trim();
             return await _companyRepository.GetByCuiAsync(cleanCif, _currentUserService.UserId, cancellationToken);
+        }
+
+        public async Task<PagedResponse<CompanyResponseDto>> GetCompaniesByUserPagedAsync(Guid userId, PageRequest page,
+            CancellationToken cancellationToken = default)
+        {
+            var companyPage = await _companyRepository.GetCompaniesByUserPagedAsync(userId, page.Page, 
+                page.PageSize, cancellationToken);
+
+            return new PagedResponse<CompanyResponseDto>
+            {
+                Items = companyPage.items.Select(MapCompanyToDto).ToList(),
+                Page = page.Page,
+                PageSize = page.PageSize,
+                TotalCount = companyPage.totalCount
+
+            };
+        }
+
+        private static CompanyResponseDto MapCompanyToDto(Company c)
+        {
+            return new CompanyResponseDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                CUI = c.CUI,
+                Address = c.Address,
+                County = c.County,
+                City = c.City,
+                Country = c.Country,
+                RegNumber = c.RegNumber,
+                IBAN = c.IBAN,
+                Bank = c.Bank,
+                IsVatPayer = c.IsVatPayer,
+                IsEFacturaActive = c.IsEFacturaActive
+            };
         }
     }
 }

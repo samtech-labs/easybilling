@@ -10,5 +10,7 @@ namespace EasyBilling.Application.Interfaces.Repositories
         Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId, CancellationToken cancellationToken = default);
         Task AddAsync(Company company, CancellationToken cancellationToken = default);
         Task DeleteAsync(Company company, CancellationToken cancellationToken = default);
+        Task<(List<Company> items, long totalCount)> GetCompaniesByUserPagedAsync(Guid userId, int page, int pageSize,
+            CancellationToken cancellationToken = default);
     }
 }

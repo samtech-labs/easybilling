@@ -4,6 +4,7 @@ using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
+using EasyBilling.Application.Responses;
 using EasyBilling.Domain.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -585,6 +586,21 @@ namespace EasyBilling.Application.Services
             {
                 throw new InvalidOperationException("Failed to download ANAF response.", ex);
             }
+        }
+
+        public async Task<PagedResponse<InvoiceResponseDto>> GetPagedInvoicesByCompanyAsync(Guid companyId, PageRequest page,
+            CancellationToken cancellationToken = default)
+        {
+            var invoicePage = await _invoiceRepository.GetInvoicesPagedAsync(
+                companyId, page.Page, page.PageSize, cancellationToken);
+
+            return new PagedResponse<InvoiceResponseDto>
+            {
+                Items = invoicePage.items.Select(MapInvoiceToDto).ToList(),
+                Page = page.Page,
+                PageSize = page.PageSize,
+                TotalCount = invoicePage.totalCount
+            };
         }
     }
 }

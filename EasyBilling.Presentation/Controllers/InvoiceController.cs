@@ -59,22 +59,31 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet]
         [Route("GetAllInvoices")]
-        public async Task<IActionResult> GetAllInvoices(Guid companyId, CancellationToken cancellationToken)
+        public async Task<IActionResult> GetAllInvoices(
+            Guid companyId,
+            [FromQuery] int page,
+            [FromQuery] int pageSize ,
+            CancellationToken cancellationToken)
         {
             try
             {
-                var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
-                return Ok(invoices);
+                var result = await _invoiceService.GetPagedInvoicesByCompanyAsync(
+                    companyId,
+                    new PageRequest { Page = page, PageSize = pageSize },
+                    cancellationToken);
+
+                return Ok(result);
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
             }
-            catch (Exception)
+            catch
             {
-               return StatusCode(500, "An error occurred while retrieving invoices.");
+                return StatusCode(500, "An error occurred while retrieving invoices.");
             }
         }
+
 
         [HttpGet]
         [Route("GetLastInvoiceNumber")]

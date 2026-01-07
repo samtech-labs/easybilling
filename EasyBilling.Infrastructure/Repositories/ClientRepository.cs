@@ -38,5 +38,24 @@ namespace EasyBilling.Infrastructure.Repositories
             _db.Clients.Remove(client);
             await _db.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task<(List<Client> items, long totalCount)> GetAllClientsByCompanyIdPagedAsync(Guid companyId, int page, int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 25) pageSize = 25;
+
+            var query = _db.Clients
+                .AsNoTracking()
+                .Where(c => c.CompanyId == companyId);
+            
+            var totalCount = await query.LongCountAsync(cancellationToken);
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+            return (items, totalCount);
+        }
     }
 }

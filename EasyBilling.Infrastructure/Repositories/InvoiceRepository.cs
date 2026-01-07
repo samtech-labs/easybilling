@@ -56,5 +56,30 @@ namespace EasyBilling.Infrastructure.Repositories
             await _db.Invoices.AddAsync(invoice, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task<(List<Invoice> items, long totalCount)> GetInvoicesPagedAsync(Guid companyId, int page, int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if(pageSize > 25) pageSize = 25;
+            var query = _db.Invoices
+                .AsNoTracking()
+                .Where(i => i.CompanyId == companyId)
+                .Include(i => i.Company)
+                .Include(i => i.Client)
+                .Include(i => i.InvoiceLines)
+                .OrderByDescending(i => i.Date)
+                .ThenByDescending(i => i.Number);
+            
+            var total = await query.LongCountAsync(cancellationToken);
+            
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+            
+            return (items, total);
+        }
     }
 }

@@ -1,6 +1,8 @@
-﻿using EasyBilling.Application.Interfaces.Repositories;
+﻿using EasyBilling.Application.Dtos;
+using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
+using EasyBilling.Application.Responses;
 using EasyBilling.Domain.Models;
 
 namespace EasyBilling.Application.Services
@@ -18,7 +20,6 @@ namespace EasyBilling.Application.Services
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
             }
-
             return await _clientRepository.GetAllClientsByCompanyIdAsync(companyId);
         }
 
@@ -81,6 +82,39 @@ namespace EasyBilling.Application.Services
             }
 
             await _clientRepository.DeleteAsync(client);
+        }
+
+        public async Task<PagedResponse<ClientResponseDto>> GetClientsByCompanyIdPagedAsync(Guid companyId, PageRequest page,
+            CancellationToken cancellationToken = default)
+        {
+            var clients = await _clientRepository.GetAllClientsByCompanyIdPagedAsync(companyId, page.Page,
+                page.PageSize, cancellationToken = default);
+
+            return new PagedResponse<ClientResponseDto>
+            {
+                Items = clients.items.Select(MapClientToDto).ToList(),
+                Page = page.Page,
+                PageSize = page.PageSize,
+                TotalCount = clients.totalCount
+
+            };
+        }
+
+        private static ClientResponseDto MapClientToDto(Client client)
+        {
+            return new ClientResponseDto
+            {
+                Id = client.Id,
+                Name = client.Name,
+                CUI = client.CUI,
+                Address = client.Address,
+                County = client.County,
+                City = client.City,
+                Country = client.Country,
+                RegNumber = client.RegNumber,
+                IBAN = client.IBAN,
+                Bank = client.Bank
+            };
         }
     }
 }

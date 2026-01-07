@@ -1,5 +1,6 @@
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
+using EasyBilling.Application.Responses;
 using EasyBilling.Domain.Models;
 
 namespace EasyBilling.Application.Interfaces.Services
@@ -12,5 +13,7 @@ namespace EasyBilling.Application.Interfaces.Services
         Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task DeleteCompanyAsync(Guid companyId);
         Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default);
+        Task<PagedResponse<CompanyResponseDto>> GetCompaniesByUserPagedAsync(Guid userId, PageRequest page, 
+            CancellationToken cancellationToken = default);
     }
 }

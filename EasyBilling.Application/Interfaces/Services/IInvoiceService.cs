@@ -2,6 +2,7 @@ using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
+using EasyBilling.Application.Responses;
 
 namespace EasyBilling.Application.Interfaces.Services
 {
@@ -16,5 +17,8 @@ namespace EasyBilling.Application.Interfaces.Services
         Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+        Task<PagedResponse<InvoiceResponseDto>> GetPagedInvoicesByCompanyAsync(
+            Guid companyId, PageRequest page, CancellationToken ct = default);
+
     }
 }

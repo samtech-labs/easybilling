@@ -33,6 +33,37 @@ namespace EasyBilling.Presentation.Controllers
             return Ok(companies);
         }
 
+        [HttpGet]
+        [Route("GetCompaniesByUserPaged")]
+        public async Task<IActionResult> GetCompaniesByUserPaged([FromQuery] int page,
+            [FromQuery] int pageSize,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)
+                                  ?? User.FindFirst(ClaimTypes.NameIdentifier);
+
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return Unauthorized();
+                }
+                
+                var result = await _companyService.GetCompaniesByUserPagedAsync(
+                    userId, new PageRequest{Page = page, PageSize = pageSize}, cancellationToken);
+
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while retrieving companies.");
+            }
+        }
+
         [HttpPost]
         [Route("CreateCompany")]
         public async Task<IActionResult> CreateCompany([FromBody] CreateCompanyRequest createCompanyRequest)
