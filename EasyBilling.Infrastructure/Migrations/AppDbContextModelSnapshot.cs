@@ -17,7 +17,7 @@ namespace EasyBilling.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -75,8 +75,14 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("City")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("text");
 
                     b.Property<string>("County")
                         .HasColumnType("text");
@@ -114,11 +120,23 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("City")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("text");
+
                     b.Property<string>("County")
                         .HasColumnType("text");
 
                     b.Property<string>("IBAN")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsEFacturaActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsVatPayer")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -144,6 +162,8 @@ namespace EasyBilling.Infrastructure.Migrations
                             Bank = "Revolut Bank UAD",
                             CUI = "RO49311115",
                             IBAN = "RO49AAAA1B31007593840000",
+                            IsEFacturaActive = false,
+                            IsVatPayer = false,
                             Name = "SAMTECH LABS SRL",
                             RegNumber = "J18/1171/2023",
                             UserId = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101")
@@ -155,6 +175,8 @@ namespace EasyBilling.Infrastructure.Migrations
                             Bank = "Banca Transilvania",
                             CUI = "RO87654321",
                             IBAN = "RO49BBBB1B31007593840000",
+                            IsEFacturaActive = false,
+                            IsVatPayer = false,
                             Name = "Demo Client SRL",
                             RegNumber = "J12/567/2020",
                             UserId = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
@@ -174,6 +196,9 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Number")
@@ -196,6 +221,59 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasIndex("CompanyId");
 
                     b.ToTable("Invoices");
+                });
+
+            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceAnafSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DownloadId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("SentXml")
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("SignedXml")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("UploadIndex")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Status", "LastCheckedAt");
+
+                    b.ToTable("InvoiceAnafSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
@@ -322,6 +400,17 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("Company");
                 });
 
+            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceAnafSubmission", b =>
+                {
+                    b.HasOne("EasyBilling.Domain.Models.Invoice", "Invoice")
+                        .WithMany("AnafSubmissions")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
                 {
                     b.HasOne("EasyBilling.Domain.Models.Invoice", "Invoice")
@@ -340,6 +429,8 @@ namespace EasyBilling.Infrastructure.Migrations
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
                 {
+                    b.Navigation("AnafSubmissions");
+
                     b.Navigation("InvoiceLines");
                 });
 

@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using EasyBilling.ANAFIntegration.Models;
+using EasyBilling.ANAFIntegration.PublicGeneralAPI.Models;
 
 namespace EasyBilling.ANAFIntegration.PublicGeneralAPI
 {

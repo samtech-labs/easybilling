@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Http;
 
 namespace EasyBilling.Infrastructure.Services

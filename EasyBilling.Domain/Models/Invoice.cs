@@ -4,6 +4,7 @@
     {
         public Guid Id { get; set; }
         public DateTime Date { get; set; } = DateTime.UtcNow;
+        public DateTime? DueDate { get; set; }
         public required decimal TotalAmount { get; set; }
         public decimal Vat { get; set; } = 0;
         public required string Series { get; set; }
@@ -14,5 +15,6 @@
         public Client Client { get; set; } = null!;
         public Company Company { get; set; } = null!;
         public ICollection<InvoiceLine>? InvoiceLines { get; set; }
+        public ICollection<InvoiceAnafSubmission>? AnafSubmissions { get; set; }
     }
 }

@@ -1,5 +1,8 @@
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
+using EasyBilling.ANAFIntegration.EFactura.Models;
 using EasyBilling.Application.Dtos;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 using QuestPDF.Fluent;
@@ -11,20 +14,26 @@ namespace EasyBilling.Application.Services
     public class InvoiceService(
         IInvoiceRepository invoiceRepository,
         ICompanyService companyService,
-        IClientRepository clientRepository) : IInvoiceService
+        IClientRepository clientRepository,
+        IEFacturaXmlGenerator eFacturaXmlGenerator,
+        IInvoiceAnafSubmissionRepository anafSubmissionRepository,
+        IEFacturaService eFacturaService) : IInvoiceService
     {
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
         private readonly ICompanyService _companyService = companyService;
         private readonly IClientRepository _clientRepository = clientRepository;
+        private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
+        private readonly IInvoiceAnafSubmissionRepository _anafSubmissionRepository = anafSubmissionRepository;
+        private readonly IEFacturaService _eFacturaService = eFacturaService;
 
         private const int MaxInvoiceLines = 5;
 
-        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request)
+        public async Task<InvoiceResponseDto> CreateInvoiceAsync(CreateInvoiceRequest request, CancellationToken cancellationToken = default)
         {
             var companyId = request.CompanyId;
 
             // Validate company exists
-            var company = await _companyService.GetCompanyByIdAsync(companyId);
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
             if (company == null)
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
@@ -64,7 +73,7 @@ namespace EasyBilling.Application.Services
             {
                 // Try to find client by CUI in database first
                 var cleanCui = clientCui.Replace("RO", "").Replace(" ", "").Trim();
-                var existingClient = await _clientRepository.GetByCuiAndCompanyIdAsync(cleanCui, companyId);
+                var existingClient = await _clientRepository.GetByCuiAndCompanyIdAsync(cleanCui, companyId, cancellationToken);
 
                 if (existingClient != null)
                 {
@@ -93,7 +102,7 @@ namespace EasyBilling.Application.Services
                         RegNumber = anafDetails.RegistrationNumber
                     };
 
-                    await _clientRepository.AddAsync(newClient);
+                    await _clientRepository.AddAsync(newClient, cancellationToken);
                     clientId = newClient.Id;
                     clientDto = MapClientToDto(newClient);
                 }
@@ -116,6 +125,29 @@ namespace EasyBilling.Application.Services
                 totalVat += lineVat;
             }
 
+            // Validate series and number
+            if (string.IsNullOrWhiteSpace(request.Series))
+            {
+                throw new InvalidOperationException("Invoice series is required.");
+            }
+
+            if (request.Number <= 0)
+            {
+                throw new InvalidOperationException("Invoice number must be greater than 0.");
+            }
+
+            // Check if there's a previous invoice with the same series
+            var lastInvoiceWithSeries = await _invoiceRepository.GetLastInvoiceBySeriesAsync(companyId, request.Series, cancellationToken);
+
+            if (lastInvoiceWithSeries != null)
+            {
+                // Ensure the new number is greater than the last one for this series
+                if (request.Number <= lastInvoiceWithSeries.Number)
+                {
+                    throw new InvalidOperationException($"Invoice number must be greater than {lastInvoiceWithSeries.Number} for series '{request.Series}'.");
+                }
+            }
+
             // Create invoice
             var invoiceId = Guid.NewGuid();
             var invoiceDate = request.Date ?? request.IssueDate ?? DateTime.UtcNow;
@@ -130,12 +162,28 @@ namespace EasyBilling.Application.Services
                 invoiceDate = invoiceDate.ToUniversalTime();
             }
 
+            // Handle DueDate if provided
+            DateTime? dueDate = null;
+            if (request.DueDate.HasValue)
+            {
+                dueDate = request.DueDate.Value;
+                if (dueDate.Value.Kind == DateTimeKind.Unspecified)
+                {
+                    dueDate = DateTime.SpecifyKind(dueDate.Value, DateTimeKind.Utc);
+                }
+                else if (dueDate.Value.Kind == DateTimeKind.Local)
+                {
+                    dueDate = dueDate.Value.ToUniversalTime();
+                }
+            }
+
             var invoice = new Invoice
             {
                 Id = invoiceId,
                 Date = invoiceDate,
-                Series = request.Series ?? "INV",
-                Number = request.Number ?? 1,
+                DueDate = dueDate,
+                Series = request.Series,
+                Number = request.Number,
                 TotalAmount = totalAmount,
                 Vat = totalVat,
                 CompanyId = companyId,
@@ -156,13 +204,14 @@ namespace EasyBilling.Application.Services
                 }).ToList()
             };
 
-            await _invoiceRepository.AddAsync(invoice);
+            await _invoiceRepository.AddAsync(invoice, cancellationToken);
 
             // Build response
             return new InvoiceResponseDto
             {
                 Id = invoice.Id,
                 Date = invoice.Date,
+                DueDate = invoice.DueDate,
                 Series = invoice.Series,
                 Number = invoice.Number,
                 TotalAmount = totalAmount,
@@ -192,9 +241,14 @@ namespace EasyBilling.Application.Services
             };
         }
 
-        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId)
+        public async Task<Invoice?> GetInvoiceAsync(Guid invoiceId, CancellationToken cancellationToken = default)
         {
-            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId);
+            return await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken);
+        }
+
+        public async Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId, CancellationToken cancellationToken = default)
+        {
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken);
 
             if (invoice == null)
             {
@@ -209,22 +263,42 @@ namespace EasyBilling.Application.Services
             return MapInvoiceToDto(invoice);
         }
 
-        public async Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId)
+        public async Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
-            var company = await _companyService.GetCompanyByIdAsync(companyId);
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
             if (company == null)
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
             }
 
-            var invoices = await _invoiceRepository.GetAllByCompanyIdAsync(companyId);
+            var invoices = await _invoiceRepository.GetAllByCompanyIdAsync(companyId, cancellationToken);
 
             return invoices.Select(MapInvoiceToDto).ToList();
         }
 
-        public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId)
+        public async Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
-            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId)
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var lastInvoice = await _invoiceRepository.GetLastInvoiceByCompanyIdAsync(companyId, cancellationToken);
+
+            var lastInvoiceNumber = lastInvoice?.Number ?? 1;
+            var lastInvoiceSeries = lastInvoice?.Series ?? "A";
+
+            return new LastInvoiceNumberDto
+            {
+                Series = lastInvoiceSeries,
+                Number = lastInvoiceNumber
+            };
+        }
+
+        public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
                 ?? throw new InvalidOperationException("Invoice not found.");
 
             QuestPDF.Settings.License = LicenseType.Community;
@@ -374,6 +448,21 @@ namespace EasyBilling.Application.Services
             return pdfBytes;
         }
 
+        public async Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
+                ?? throw new InvalidOperationException("Invoice not found.");
+            try
+            {
+                var xmlContent = _eFacturaXmlGenerator.GenerateXml(invoice);
+                return xmlContent;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to generate XML for ANAF.", ex);
+            };
+        }
+
         private static ClientResponseDto MapClientToDto(Client client)
         {
             return new ClientResponseDto
@@ -398,6 +487,7 @@ namespace EasyBilling.Application.Services
             {
                 Id = invoice.Id,
                 Date = invoice.Date,
+                DueDate = invoice.DueDate,
                 Series = invoice.Series,
                 Number = invoice.Number,
                 TotalAmount = totalAmount,
@@ -425,6 +515,76 @@ namespace EasyBilling.Application.Services
                     Unit = line.Unit
                 }).ToList() ?? new List<InvoiceLineResponseDto>()
             };
+        }
+
+        public async Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var latestSubmission = await _anafSubmissionRepository.GetLatestByInvoiceIdAsync(invoiceId, cancellationToken);
+
+            if (latestSubmission == null)
+            {
+                // No submission exists yet - return a default status
+                return new AnafSubmissionStatusDto
+                {
+                    Id = null,
+                    Status = AnafSubmissionStatus.Pending,
+                    ErrorMessage = null,
+                    UploadedAt = null,
+                    LastCheckedAt = null,
+                    DownloadId = null
+                };
+            }
+
+            return new AnafSubmissionStatusDto
+            {
+                Id = latestSubmission.Id,
+                Status = latestSubmission.Status,
+                ErrorMessage = latestSubmission.ErrorMessage,
+                UploadedAt = latestSubmission.UploadedAt,
+                LastCheckedAt = latestSubmission.LastCheckedAt,
+                DownloadId = latestSubmission.DownloadId
+            };
+        }
+
+        public async Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        {
+            var successfulSubmission = await _anafSubmissionRepository.GetSuccessfulByInvoiceIdAsync(invoiceId, cancellationToken);
+
+            if (successfulSubmission == null)
+            {
+                throw new InvalidOperationException("No successful ANAF submission found for this invoice.");
+            }
+
+            if (successfulSubmission.DownloadId == null)
+            {
+                throw new InvalidOperationException("No download ID available for the successful ANAF submission.");
+            }
+
+            try
+            {
+                var downloadResponse = await _eFacturaService.DownloadAnafSignedInvoiceAsync(invoiceId, successfulSubmission.Invoice.CompanyId, successfulSubmission.DownloadId, cancellationToken: cancellationToken);
+
+                if (downloadResponse == null || !downloadResponse.Success)
+                {
+                    throw new InvalidOperationException("Failed to download ANAF response.");
+                }
+
+                if (downloadResponse.ZipContent == null || downloadResponse.ZipContent.Length == 0)
+                {
+                    throw new InvalidOperationException("Downloaded ANAF response is empty.");
+                }
+
+                if (downloadResponse.ErrorMessage != null)
+                {
+                    throw new InvalidOperationException($"Error in downloaded ANAF response: {downloadResponse.ErrorMessage}");
+                }
+
+                return downloadResponse;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to download ANAF response.", ex);
+            }
         }
     }
 }
