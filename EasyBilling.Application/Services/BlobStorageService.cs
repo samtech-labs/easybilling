@@ -24,7 +24,10 @@ public sealed class BlobStorageService
     }
 
     private static string BuildInvoicePdfBlobName(Guid companyId, Guid invoiceId)
-        => $"companies/{companyId}/invoices/{invoiceId}.pdf";
+    {
+        return $"companies/{companyId}/invoices/{invoiceId}.pdf";
+
+    }
 
     /// <summary>
     /// Uploads the invoice pdf to blob storage under companies/{companyId}/invoices/{invoiceId}.pdf
@@ -37,7 +40,10 @@ public sealed class BlobStorageService
         CancellationToken ct = default)
     {
         if (pdfBytes is null || pdfBytes.Length == 0)
+        {
+
             throw new ArgumentException("pdfBytes cannot be null or empty", nameof(pdfBytes));
+        }
 
         await _blobContainer.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
 
@@ -85,21 +91,33 @@ public sealed class BlobStorageService
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(containerName))
+        {
             throw new ArgumentException("containerName cannot be null/empty", nameof(containerName));
+        }
 
         if (string.IsNullOrWhiteSpace(blobName))
+        {
             throw new ArgumentException("blobName cannot be null/empty", nameof(blobName));
+        }
 
         try
         {
-            var container = containerName == _blobContainer.Name
-                ? _blobContainer
-                : _blobServiceClient.GetBlobContainerClient(containerName);
+            BlobContainerClient container;
+            if (containerName == _blobContainer.Name)
+            {
+                container = _blobContainer;
+            }
+            else
+            {
+                container = _blobServiceClient.GetBlobContainerClient(containerName);
+            }
 
             var blob = container.GetBlobClient(blobName);
-            
+
             if (!await blob.ExistsAsync(ct))
+            {
                 throw new FileNotFoundException("Blob not found.", blobName);
+            }
 
             var download = await blob.DownloadContentAsync(ct);
             return download.Value.Content.ToArray();

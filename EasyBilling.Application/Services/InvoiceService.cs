@@ -298,44 +298,44 @@ namespace EasyBilling.Application.Services
             };
         }
 
-public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default)
 {
-    var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
-        ?? throw new InvalidOperationException("Invoice not found.");
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(invoiceId, cancellationToken)
+                ?? throw new InvalidOperationException("Invoice not found.");
 
-    QuestPDF.Settings.License = LicenseType.Community;
-    var pdfBytes = Document.Create(container =>
-    {
-        container.Page(page =>
+            QuestPDF.Settings.License = LicenseType.Community;
+            var pdfBytes = Document.Create(container =>
         {
-            page.Size(PageSizes.A4);
-            page.Margin(40);
-            page.DefaultTextStyle(x => x.FontSize(11));
-
-            page.Content().Column(col =>
+                container.Page(page =>
             {
-                col.Spacing(15);
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(11));
 
-                col.Item().Text("FACTURA")
-                    .FontSize(24)
-                    .Bold()
-                    .FontColor(Colors.Blue.Medium);
-
-                decimal grandTotal = 0;
-                var vatRates = invoice.InvoiceLines?.Select(l => l.VatRate).Distinct().ToList() ?? new List<decimal>();
-                var vatRateDisplay = vatRates.Count == 1 ? $"{vatRates[0]}%" : "Diverse";
-
-                col.Item().Row(row =>
+                    page.Content().Column(col =>
                 {
-                    row.RelativeItem().Text(text =>
-                    {
-                        text.Span("Seria ");
-                        text.Span(invoice.Series);
-                        text.Span(" Nr. ");
-                        text.Span(invoice.Number.ToString());
-                        text.Span(" din ");
-                        text.Span(invoice.Date.ToString("dd.MM.yyyy"));
-                    });
+                    col.Spacing(15);
+
+                    col.Item().Text("FACTURA")
+                        .FontSize(24)
+                        .Bold()
+                        .FontColor(Colors.Blue.Medium);
+
+                    decimal grandTotal = 0;
+                    var vatRates = invoice.InvoiceLines?.Select(l => l.VatRate).Distinct().ToList() ?? new List<decimal>();
+                    var vatRateDisplay = vatRates.Count == 1 ? $"{vatRates[0]}%" : "Diverse";
+
+                    col.Item().Row(row =>
+                {
+                        row.RelativeItem().Text(text =>
+                        {
+                            text.Span("Seria ");
+                            text.Span(invoice.Series);
+                            text.Span(" Nr. ");
+                            text.Span(invoice.Number.ToString());
+                            text.Span(" din ");
+                            text.Span(invoice.Date.ToString("dd.MM.yyyy"));
+                        });
 
                     row.RelativeItem().AlignRight().Text(text =>
                     {
