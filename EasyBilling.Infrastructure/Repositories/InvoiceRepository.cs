@@ -30,6 +30,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
                 .Where(i => i.CompanyId == companyId)
+                .Where(i => !i.IsCreditNote)
                 .OrderByDescending(i => i.Date)
                 .ToListAsync(cancellationToken);
         }
@@ -38,6 +39,7 @@ namespace EasyBilling.Infrastructure.Repositories
         {
             return await _db.Invoices
                 .Where(i => i.CompanyId == companyId)
+                .Where(i => !i.IsCreditNote)
                 .OrderByDescending(i => i.Date)
                 .ThenByDescending(i => i.Number)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -47,6 +49,7 @@ namespace EasyBilling.Infrastructure.Repositories
         {
             return await _db.Invoices
                 .Where(i => i.CompanyId == companyId && i.Series == series)
+                .Where(i => !i.IsCreditNote)
                 .OrderByDescending(i => i.Number)
                 .FirstOrDefaultAsync(cancellationToken);
         }

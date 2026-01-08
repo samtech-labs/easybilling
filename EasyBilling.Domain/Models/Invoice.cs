@@ -9,6 +9,12 @@
         public decimal Vat { get; set; } = 0;
         public required string Series { get; set; }
         public required int Number { get; set; }
+        public InvoiceType Type { get; set; } = InvoiceType.Invoice;
+
+        // For CreditNote, reference the original invoice
+        public Guid? OriginalInvoiceId { get; set; }
+        public Invoice? OriginalInvoice { get; set; }
+
         public required Guid CompanyId { get; set; }
         public required Guid ClientId { get; set; }
 
@@ -16,5 +22,15 @@
         public Company Company { get; set; } = null!;
         public ICollection<InvoiceLine>? InvoiceLines { get; set; }
         public ICollection<InvoiceAnafSubmission>? AnafSubmissions { get; set; }
+        public ICollection<Invoice> CreditNotes { get; set; } = [];
+
+        public bool IsCreditNote => Type == InvoiceType.CreditNote;
+        public bool HasCreditNotes => CreditNotes.Any();
+    }
+
+    public enum InvoiceType
+    {
+        Invoice = 380, // Normal invoice
+        CreditNote = 381 // Storno
     }
 }
