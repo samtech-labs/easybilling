@@ -65,9 +65,13 @@ public sealed class BlobStorageService
         {
             // overwrite: true makes retries safe if you regenerate/upload again
             await blob.UploadAsync(stream, options, cancellationToken: ct);
-            return (_blobContainer.Name, blobName);
+            return (_blobContainer.Name,
+                blobName);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (RequestFailedException ex)
         {
             throw new InvalidOperationException(
@@ -122,7 +126,10 @@ public sealed class BlobStorageService
             var download = await blob.DownloadContentAsync(ct);
             return download.Value.Content.ToArray();
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (RequestFailedException ex)
         {
             throw new InvalidOperationException(
