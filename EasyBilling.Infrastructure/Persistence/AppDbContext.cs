@@ -3,16 +3,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EasyBilling.Infrastructure.Persistence
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
         public DbSet<Company> Companies { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<AnafToken> AnafTokens { get; set; }
         public DbSet<InvoiceAnafSubmission> InvoiceAnafSubmissions { get; set; }
+        public DbSet<MembershipType> MembershipTypes { get; set; }
+        public DbSet<Membership> Memberships { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +29,12 @@ namespace EasyBilling.Infrastructure.Persistence
                 .HasOne(u => u.AnafToken)
                 .WithOne(t => t.User)
                 .HasForeignKey<AnafToken>(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Membership)
+                .WithOne(m => m.User)
+                .HasForeignKey<Membership>(m => m.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Company>()
@@ -74,47 +80,39 @@ namespace EasyBilling.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.Status, e.LastCheckedAt });
             });
 
-            modelBuilder.Entity<User>().HasData(
-                new User
-                {
-                    Id = Guid.Parse("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
-                    Username = "admin",
-                    Password = "admin123",
-                    Email = "admin@gmail.com"
-                },
-                new User
-                {
-                    Id = Guid.Parse("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
-                    Username = "user",
-                    Password = "user123",
-                    Email = "user@gmail.com"
-                }
-            );
+            modelBuilder.Entity<MembershipType>(entity =>
+            {
+                entity.ToTable("MembershipTypes");
 
-            modelBuilder.Entity<Company>().HasData(
-                new Company
-                {
-                    Id = Guid.Parse("e11e24c2-8c61-4adb-af89-9464ac44964a"),
-                    Name = "SAMTECH LABS SRL",
-                    CUI = "RO49311115",
-                    RegNumber = "J18/1171/2023",
-                    Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
-                    IBAN = "RO49AAAA1B31007593840000",
-                    Bank = "Revolut Bank UAD",
-                    UserId = Guid.Parse("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101")
-                },
-                new Company
-                {
-                    Id = Guid.Parse("40019908-3df7-4764-bbb7-1776e8e23245"),
-                    Name = "Demo Client SRL",
-                    CUI = "RO87654321",
-                    RegNumber = "J12/567/2020",
-                    Address = "Str. Testului 2, Cluj-Napoca, Romania",
-                    IBAN = "RO49BBBB1B31007593840000",
-                    Bank = "Banca Transilvania",
-                    UserId = Guid.Parse("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
-                }
-            );
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Name)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.Price)
+                    .HasPrecision(18, 2);
+
+                entity.HasIndex(e => e.Name)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<Membership>(entity =>
+            {
+                entity.ToTable("Memberships");
+
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.MembershipType)
+                    .WithMany()
+                    .HasForeignKey(e => e.MembershipTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => e.UserId)
+                    .IsUnique();
+
+                entity.HasIndex(e => e.EndDate);
+            });
         }
     }
 }
