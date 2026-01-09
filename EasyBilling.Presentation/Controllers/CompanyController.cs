@@ -1,6 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using EasyBilling.Application.Interfaces;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,14 +10,9 @@ namespace EasyBilling.Presentation.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class CompanyController : ControllerBase
+    public class CompanyController(ICompanyService companyService) : ControllerBase
     {
-        private readonly ICompanyService _companyService;
-
-        public CompanyController(ICompanyService companyService)
-        {
-            _companyService = companyService;
-        }
+        private readonly ICompanyService _companyService = companyService;
 
         [HttpGet]
         [Route("GetAllCompanies")]
@@ -77,6 +72,25 @@ namespace EasyBilling.Presentation.Controllers
             catch (Exception)
             {
                 return StatusCode(500, "An error occurred while retrieving company details from ANAF.");
+            }
+        }
+
+        [HttpDelete]
+        [Route("DeleteCompany")]
+        public async Task<IActionResult> DeleteCompany(Guid companyId)
+        {
+            try
+            {
+                await _companyService.DeleteCompanyAsync(companyId);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while deleting the company.");
             }
         }
     }

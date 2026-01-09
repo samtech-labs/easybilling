@@ -1,4 +1,7 @@
-﻿using EasyBilling.Application.Interfaces;
+using EasyBilling.ANAFIntegration.EFactura.Interfaces;
+using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,28 +10,176 @@ namespace EasyBilling.Presentation.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class InvoiceController : ControllerBase
+    public class InvoiceController(
+        IInvoiceService invoiceService,
+        IInvoiceRepository invoiceRepository,
+        IAnafIntegrationService anafIntegrationService) : ControllerBase
     {
-        private readonly IInvoiceService _invoiceService;
+        private readonly IInvoiceService _invoiceService = invoiceService;
+        private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
+        private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
 
-        public InvoiceController(IInvoiceService invoiceService)
+        [HttpPost]
+        [Route("CreateInvoice")]
+        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
         {
-            _invoiceService = invoiceService;
-        }
-
-        // TODO this also should include requests json body with invoice details
-        [HttpPost("pdf")]
-        public async Task<IActionResult> CreateInvoice(Guid companyId)
-        {
-            var invoice = await _invoiceService.CreateInvoiceAsync(companyId);
-
-            return File(invoice, "application/pdf", "invoice.pdf");
+            try
+            {
+                var invoice = await _invoiceService.CreateInvoiceAsync(request, cancellationToken);
+                return Ok(invoice);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while creating the invoice.");
+            }
         }
 
         [HttpGet]
-        public IActionResult GetInvoice()
+        [Route("GetInvoice")]
+        public async Task<IActionResult> GetInvoice(Guid invoiceId, Guid companyId, CancellationToken cancellationToken)
         {
-            return Ok("Hello world");
+            try
+            {
+                var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, companyId, cancellationToken);
+                return Ok(invoice);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the invoice.");
+            }
+        }
+
+        [HttpGet]
+        [Route("GetAllInvoices")]
+        public async Task<IActionResult> GetAllInvoices(Guid companyId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
+                return Ok(invoices);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+               return StatusCode(500, "An error occurred while retrieving invoices.");
+            }
+        }
+
+        [HttpGet]
+        [Route("GetLastInvoiceNumber")]
+        public async Task<IActionResult> GetLastInvoiceNumber(Guid companyId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var lastInvoiceNumber = await _invoiceService.GetLastInvoiceNumberAsync(companyId, cancellationToken);
+                return Ok(lastInvoiceNumber);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the last invoice number.");
+            }
+        }
+
+        [HttpGet]
+        [Route("GeneratePdf")]
+        public async Task<IActionResult> GeneratePdf(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(invoiceId, cancellationToken);
+                return File(pdfBytes, "application/pdf", "invoice.pdf");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while generating the invoice PDF.");
+            }
+        }
+
+        [HttpPost]
+        [Route("SendEFactura")]
+        public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                if (invoice == null)
+                {
+                    return NotFound(new { message = "Invoice not found." });
+                }
+                var uploadInvoiceResult = await _anafIntegrationService.UploadXmlToAnaf(invoiceId, cancellationToken);
+                return Ok(uploadInvoiceResult);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while sending the invoice to ANAF.");
+            }
+        }
+
+        [HttpGet]
+        [Route("GetAnafSubmissionStatus")]
+        public async Task<IActionResult> GetAnafSubmissionStatus(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var status = await _invoiceService.GetAnafSubmissionStatusAsync(invoiceId, cancellationToken);
+                return Ok(status);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the ANAF submission status.");
+            }
+        }
+
+        [HttpGet]
+        [Route("DownloadAnafResponse")]
+        public async Task<IActionResult> DownloadAnafResponse(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var downloadResponse = await _invoiceService.DownloadAnafResponseAsync(invoiceId, cancellationToken);
+
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                var fileName = invoice != null
+                    ? $"ANAF_Response_{invoice.Series}_{invoice.Number}.zip"
+                    : $"ANAF_Response_{invoiceId}.zip";
+
+                return File(downloadResponse.ZipContent, "application/zip", fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while downloading the ANAF response.");
+            }
         }
     }
 }

@@ -11,6 +11,8 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<User> Users { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<AnafToken> AnafTokens { get; set; }
+        public DbSet<InvoiceAnafSubmission> InvoiceAnafSubmissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +23,12 @@ namespace EasyBilling.Infrastructure.Persistence
                 .WithOne(c => c.User)
                 .HasForeignKey(c => c.UserId)
                 .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.AnafToken)
+                .WithOne(t => t.User)
+                .HasForeignKey<AnafToken>(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Company>()
@@ -36,6 +44,35 @@ namespace EasyBilling.Infrastructure.Persistence
                 .HasForeignKey(il => il.InvoiceId)
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<InvoiceAnafSubmission>(entity =>
+            {
+                entity.ToTable("InvoiceAnafSubmissions");
+
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Invoice)
+                    .WithMany(i => i.AnafSubmissions)
+                    .HasForeignKey(e => e.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(e => e.UploadIndex)
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.DownloadId)
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.ErrorMessage)
+                    .HasMaxLength(2000);
+
+                entity.Property(e => e.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(20);
+
+                entity.HasIndex(e => e.InvoiceId);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => new { e.Status, e.LastCheckedAt });
+            });
 
             modelBuilder.Entity<User>().HasData(
                 new User

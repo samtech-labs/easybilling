@@ -1,4 +1,4 @@
-namespace EasyBilling.ANAFIntegration.Models
+namespace EasyBilling.ANAFIntegration.PublicGeneralAPI.Models
 {
     public class CompanyDetails
     {
