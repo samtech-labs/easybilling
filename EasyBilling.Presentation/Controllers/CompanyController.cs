@@ -56,6 +56,30 @@ namespace EasyBilling.Presentation.Controllers
             }
         }
 
+        [HttpPost]
+        [Authorize(Roles = "ADMIN")]
+        [Route("CreateCompanyForUser")]
+        public async Task<IActionResult> CreateCompanyForUser([FromBody] CreateCompanyForUserRequest createCompanyForUserRequest)
+        {
+            try
+            {
+                var company = await _companyService.CreateCompanyForUserAsync(createCompanyForUserRequest);
+                return Ok(company);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while creating the company for the user.");
+            }
+        }
+
         [HttpGet]
         [Route("GetCompanyDetailsFromAnaf")]
         public async Task<IActionResult> GetCompanyDetailsFromAnaf(string cui)

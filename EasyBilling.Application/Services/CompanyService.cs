@@ -92,6 +92,53 @@ namespace EasyBilling.Application.Services
             return company;
         }
 
+        public async Task<Company> CreateCompanyForUserAsync(CreateCompanyForUserRequest createCompanyForUserRequest)
+        {
+            // This method can only be called by ADMINs (enforced by controller authorization)
+            // Validate that the target user exists
+            var targetUserId = createCompanyForUserRequest.UserId;
+
+            // Check company limit per user
+            var userCompanies = await _companyRepository.GetAllCompaniesByUserAsync(targetUserId);
+            if (userCompanies.Count >= MaxCompaniesPerUser)
+            {
+                throw new InvalidOperationException($"The user has reached the maximum limit of {MaxCompaniesPerUser} companies.");
+            }
+
+            var cleanCui = createCompanyForUserRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
+
+            // Check if company with this CUI already exists for this user
+            var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, targetUserId);
+            if (existingCompany != null)
+            {
+                throw new InvalidOperationException($"A company with CUI '{createCompanyForUserRequest.CUI}' already exists for this user.");
+            }
+
+            // Fetch ANAF details
+            var anafDetails = await ANAFIntegration.ANAFIntegration.GetCompanyDetails(cleanCui, DateTime.Today);
+
+            // Prioritize ANAF data when available, but allow user overrides for certain fields
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                Name = anafDetails?.Name ?? createCompanyForUserRequest.Name,
+                CUI = cleanCui,
+                Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createCompanyForUserRequest.Address,
+                County = anafDetails?.RegisteredAddress?.County ?? createCompanyForUserRequest.County,
+                City = anafDetails?.RegisteredAddress?.City ?? createCompanyForUserRequest.City,
+                Country = anafDetails?.RegisteredAddress?.Country ?? createCompanyForUserRequest.Country,
+                RegNumber = anafDetails?.RegistrationNumber ?? createCompanyForUserRequest.RegNumber,
+                IBAN = createCompanyForUserRequest.IBAN,
+                Bank = createCompanyForUserRequest.Bank,
+                IsVatPayer = createCompanyForUserRequest.IsVatPayer ?? anafDetails?.IsVatPayer ?? false,
+                IsEFacturaActive = createCompanyForUserRequest.IsEFacturaActive ?? anafDetails?.IsEFacturaActive ?? false,
+                UserId = targetUserId // Assign to the specified user
+            };
+
+            await _companyRepository.AddAsync(company);
+            return company;
+        }
+
         public async Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             return await _companyRepository.GetByIdAsync(companyId, cancellationToken);
