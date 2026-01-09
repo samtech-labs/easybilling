@@ -4,6 +4,7 @@ using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
+using EasyBilling.Domain.Enums;
 using EasyBilling.Domain.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -276,6 +277,19 @@ namespace EasyBilling.Application.Services
             return invoices.Select(MapInvoiceToDto).ToList();
         }
 
+        public async Task<List<InvoiceResponseDto>> GetCreditNotesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var creditNotes = await _invoiceRepository.GetAllCreditNotesByCompanyIdAsync(companyId, cancellationToken);
+
+            return creditNotes.Select(MapInvoiceToDto).ToList();
+        }
+
         public async Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
@@ -493,6 +507,11 @@ namespace EasyBilling.Application.Services
                 TotalAmount = totalAmount,
                 TotalVat = totalVat,
                 GrandTotal = totalAmount + totalVat,
+                Type = invoice.Type,
+                OriginalInvoiceId = invoice.OriginalInvoiceId,
+                OriginalInvoiceNumber = invoice.OriginalInvoice != null
+                    ? $"{invoice.OriginalInvoice.Series} nr. {invoice.OriginalInvoice.Number}"
+                    : null,
                 Company = new CompanyResponseDto
                 {
                     Id = invoice.Company.Id,

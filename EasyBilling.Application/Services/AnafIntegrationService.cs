@@ -100,7 +100,9 @@ namespace EasyBilling.Application.Services
             var cui = invoice.Company.CUI;
             cui = cui.StartsWith("RO") ? cui[2..] : cui;
 
-            var uploadIndex = await UploadXmlAsync(xml, cui, token!.AccessToken, cancellationToken);
+            var standard = invoice.IsCreditNote ? "CN" : "UBL";
+
+            var uploadIndex = await UploadXmlAsync(xml, standard, cui, token!.AccessToken, cancellationToken);
 
             var invoiceAnafSubmission = new InvoiceAnafSubmission
             {
@@ -137,10 +139,10 @@ namespace EasyBilling.Application.Services
             }
         }
 
-        private async Task<string> UploadXmlAsync(string xml, string cif, string accessToken, CancellationToken ct)
+        private async Task<string> UploadXmlAsync(string xml, string standard, string cif, string accessToken, CancellationToken ct)
         {
             var client = _anafIntegrationHelper.CreateAuthenticatedClient(accessToken);
-            var url = $"{BaseUrl}/upload?standard=UBL&cif={cif}";
+            var url = $"{BaseUrl}/upload?standard={standard}&cif={cif}";
 
             var content = new StringContent(xml, Encoding.UTF8, "text/plain");
             var response = await client.PostAsync(url, content, ct);

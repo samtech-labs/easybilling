@@ -1,4 +1,6 @@
-﻿namespace EasyBilling.Domain.Models
+﻿using EasyBilling.Domain.Enums;
+
+namespace EasyBilling.Domain.Models
 {
     public class Invoice
     {
@@ -26,11 +28,5 @@
 
         public bool IsCreditNote => Type == InvoiceType.CreditNote;
         public bool HasCreditNotes => CreditNotes.Any();
-    }
-
-    public enum InvoiceType
-    {
-        Invoice = 380, // Normal invoice
-        CreditNote = 381 // Storno
     }
 }

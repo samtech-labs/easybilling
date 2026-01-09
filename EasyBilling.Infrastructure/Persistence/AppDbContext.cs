@@ -1,4 +1,5 @@
 ﻿using EasyBilling.Domain.Models;
+using EasyBilling.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EasyBilling.Infrastructure.Persistence
