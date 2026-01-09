@@ -65,8 +65,7 @@ public sealed class BlobStorageService
         {
             // overwrite: true makes retries safe if you regenerate/upload again
             await blob.UploadAsync(stream, options, cancellationToken: ct);
-            return (_blobContainer.Name,
-                blobName);
+            return (_blobContainer.Name, blobName);
         }
         catch (OperationCanceledException)
         {
