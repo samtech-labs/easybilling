@@ -33,6 +33,22 @@ namespace EasyBilling.Presentation.Controllers
             return Ok(companies);
         }
 
+        [HttpGet]
+        [Authorize(Roles = "ADMIN")]
+        [Route("GetCompaniesForUser")]
+        public async Task<IActionResult> GetCompaniesForUser(Guid userId)
+        {
+            try
+            {
+                var companies = await _companyService.GetCompaniesByUserAsync(userId);
+                return Ok(companies);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving companies for the user.");
+            }
+        }
+
         [HttpPost]
         [Route("CreateCompany")]
         public async Task<IActionResult> CreateCompany([FromBody] CreateCompanyRequest createCompanyRequest)
@@ -115,6 +131,26 @@ namespace EasyBilling.Presentation.Controllers
             catch (Exception)
             {
                 return StatusCode(500, "An error occurred while deleting the company.");
+            }
+        }
+
+        [HttpDelete]
+        [Authorize(Roles = "ADMIN")]
+        [Route("DeleteCompanyForUser")]
+        public async Task<IActionResult> DeleteCompanyForUser(Guid companyId, Guid userId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _companyService.DeleteCompanyForUserAsync(companyId, userId, cancellationToken);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while deleting the company for the user.");
             }
         }
     }

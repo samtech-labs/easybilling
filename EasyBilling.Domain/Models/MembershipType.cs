@@ -8,5 +8,6 @@
         public required int MaxInvoicesPerMonth { get; set; }
         public required bool EFacturaActive { get; set; }
         public required int DurationInDays { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

@@ -18,6 +18,11 @@ namespace EasyBilling.Application.Services
             return await _companyRepository.GetAllCompaniesByUserAsync(userId);
         }
 
+        public async Task<List<Company>> GetAllCompaniesAsync(CancellationToken cancellationToken = default)
+        {
+            return await _companyRepository.GetAllCompaniesAsync(cancellationToken);
+        }
+
         public async Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui)
         {
             var cleanCui = cui.Replace("RO", "").Replace(" ", "").Trim();
@@ -159,6 +164,23 @@ namespace EasyBilling.Application.Services
             }
 
             await _companyRepository.DeleteAsync(company);
+        }
+
+        public async Task DeleteCompanyForUserAsync(Guid companyId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
+
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            if (company.UserId != userId)
+            {
+                throw new InvalidOperationException("Company does not belong to the specified user.");
+            }
+
+            await _companyRepository.DeleteAsync(company, cancellationToken);
         }
 
         public async Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default)

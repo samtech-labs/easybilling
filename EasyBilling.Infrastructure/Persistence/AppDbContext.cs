@@ -95,6 +95,8 @@ namespace EasyBilling.Infrastructure.Persistence
 
                 entity.HasIndex(e => e.Name)
                     .IsUnique();
+
+                entity.HasIndex(e => e.CreatedAt);
             });
 
             modelBuilder.Entity<Membership>(entity =>
