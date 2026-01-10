@@ -320,7 +320,7 @@ namespace EasyBilling.Application.Services
                             .FontSize(24)
                             .Bold()
                             .FontColor(Colors.Blue.Medium);
-
+                        
                         decimal grandTotal = 0;
                         var vatRates = invoice.InvoiceLines?.Select(l => l.VatRate).Distinct().ToList() ?? new List<decimal>();
                         var vatRateDisplay = vatRates.Count == 1 ? $"{vatRates[0]}%" : "Diverse";
@@ -328,7 +328,7 @@ namespace EasyBilling.Application.Services
                         col.Item().Row(row =>
                         {   
                             row.RelativeItem().Text(text =>
-                            {
+                            { 
                                 text.Span("Seria ");
                                 text.Span(invoice.Series);
                                 text.Span(" Nr. ");
@@ -407,6 +407,7 @@ namespace EasyBilling.Application.Services
 
                                 var lineTotal = item.Quantity * item.UnitPrice;
                                 var lineVat = lineTotal * item.VatRate / 100;
+                                
                                 table.Cell().Text(index.ToString());
                                 table.Cell().Text(item.Description);
                                 table.Cell().AlignCenter().Text(item.Unit);
@@ -446,8 +447,7 @@ namespace EasyBilling.Application.Services
                     });
                 });
             }).GeneratePdf();
-
-    //upload invoice to blob storage
+            
         try
         {
             var (containerName, blobName) = await _blobStorageService.UploadInvoicePdfAsync(
@@ -630,3 +630,5 @@ namespace EasyBilling.Application.Services
 
     }
 }
+
+
