@@ -1,9 +1,9 @@
 ﻿using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Services;
+using EasyBilling.Presentation.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.DotNet.Scaffolding.Shared;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -28,7 +28,7 @@ namespace EasyBilling.Presentation.Controllers
         private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("Anaf.OAuth.State");
 
         [HttpGet("authorize")]
-        [Authorize]
+        [Authorize(Policy = Policies.CanUseEFactura)]
         public IActionResult Authorize()
         {
             var userId = _currentUserService.UserId;
@@ -140,7 +140,7 @@ namespace EasyBilling.Presentation.Controllers
         }
 
         [HttpPost("refresh")]
-        [Authorize]
+        [Authorize(Policy = Policies.CanUseEFactura)]
         public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken)
         {
             var userId = _currentUserService.UserId;
@@ -211,7 +211,7 @@ namespace EasyBilling.Presentation.Controllers
         }
 
         [HttpGet("status")]
-        [Authorize]
+        [Authorize(Policy = Policies.CanUseEFactura)]
         public async Task<IActionResult> TokenStatus(CancellationToken cancellationToken)
         {
             var userId = _currentUserService.UserId;
