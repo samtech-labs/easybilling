@@ -63,6 +63,8 @@ namespace EasyBilling.Application.Services
                 throw new InvalidOperationException($"You have reached the maximum limit of {MaxCompaniesPerUser} companies.");
             }
 
+
+            // move this to a helper function. it alreadys exists in multiple places
             var cleanCui = createCompanyRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
 
             var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _currentUserService.UserId);
