@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260108135809_AddCreditNoteSupport")]
+    partial class AddCreditNoteSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,27 +291,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.ToTable("InvoiceAnafSubmissions", (string)null);
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceBlob", b =>
-                {
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("BlobName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ContainerName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UploadedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("InvoiceId");
-
-                    b.ToTable("InvoiceBlobs", (string)null);
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -449,15 +431,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceBlob", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.Invoice", null)
-                        .WithOne()
-                        .HasForeignKey("EasyBilling.Domain.Models.InvoiceBlob", "InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceLine", b =>

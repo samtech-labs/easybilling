@@ -6,10 +6,10 @@ using EasyBilling.Application.Interfaces.Repositories;
 
 namespace EasyBilling.Application.Services
 {
-    public class CompanyService(ICompanyRepository companyRepository, ICurrentUserService currentUserService) : ICompanyService
+    public class CompanyService(ICompanyRepository companyRepository, UserContext userContext) : ICompanyService
     {
         private readonly ICompanyRepository _companyRepository = companyRepository;
-        private readonly ICurrentUserService _currentUserService = currentUserService;
+        private readonly UserContext _userContext = userContext;
 
         private const int MaxCompaniesPerUser = 3;
 
@@ -46,13 +46,13 @@ namespace EasyBilling.Application.Services
 
         public async Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest)
         {
-            if (_currentUserService.UserId == Guid.Empty)
+            if (_userContext.UserId == Guid.Empty)
             {
                 throw new UnauthorizedAccessException("User is not authenticated.");
             }
 
             // Check company limit per user
-            var userCompanies = await _companyRepository.GetAllCompaniesByUserAsync(_currentUserService.UserId);
+            var userCompanies = await _companyRepository.GetAllCompaniesByUserAsync(_userContext.UserId);
             if (userCompanies.Count >= MaxCompaniesPerUser)
             {
                 throw new InvalidOperationException($"You have reached the maximum limit of {MaxCompaniesPerUser} companies.");
@@ -60,16 +60,13 @@ namespace EasyBilling.Application.Services
 
             var cleanCui = createCompanyRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
 
-            var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _currentUserService.UserId);
+            var existingCompany = await _companyRepository.GetByCuiAsync(cleanCui, _userContext.UserId);
             if (existingCompany != null)
             {
                 throw new InvalidOperationException($"A company with CUI '{createCompanyRequest.CUI}' already exists.");
             }
 
             var anafDetails = await ANAFIntegration.ANAFIntegration.GetCompanyDetails(cleanCui, DateTime.Today);
-
-            // We need to establish if we prefer ANAF data over user-provided data.
-            // For the moment, we will prioritize ANAF data when available, but still allow user overrides for certain fields.
 
             var company = new Company
             {
@@ -85,7 +82,7 @@ namespace EasyBilling.Application.Services
                 Bank = createCompanyRequest.Bank,
                 IsVatPayer = createCompanyRequest.IsVatPayer ?? anafDetails?.IsVatPayer ?? false,
                 IsEFacturaActive = createCompanyRequest.IsEFacturaActive ?? anafDetails?.IsEFacturaActive ?? false,
-                UserId = _currentUserService.UserId
+                UserId = _userContext.UserId
             };
 
             await _companyRepository.AddAsync(company);
@@ -106,7 +103,7 @@ namespace EasyBilling.Application.Services
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
             }
 
-            if (company.UserId != _currentUserService.UserId)
+            if (company.UserId != _userContext.UserId)
             {
                 throw new InvalidOperationException("Company does not belong to the current user.");
             }
@@ -117,7 +114,7 @@ namespace EasyBilling.Application.Services
         public async Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default)
         {
             var cleanCif = cif.Replace("RO", "").Replace(" ", "").Trim();
-            return await _companyRepository.GetByCuiAsync(cleanCif, _currentUserService.UserId, cancellationToken);
+            return await _companyRepository.GetByCuiAsync(cleanCif, _userContext.UserId, cancellationToken);
         }
     }
 }

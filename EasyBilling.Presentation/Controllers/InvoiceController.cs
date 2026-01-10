@@ -77,6 +77,25 @@ namespace EasyBilling.Presentation.Controllers
         }
 
         [HttpGet]
+        [Route("GetAllCreditNotes")]
+        public async Task<IActionResult> GetAllCreditNotes(Guid companyId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var creditNotes = await _invoiceService.GetCreditNotesByCompanyIdAsync(companyId, cancellationToken);
+                return Ok(creditNotes);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+               return StatusCode(500, "An error occurred while retrieving credit notes.");
+            }
+        }
+
+        [HttpGet]
         [Route("GetLastInvoiceNumber")]
         public async Task<IActionResult> GetLastInvoiceNumber(Guid companyId, CancellationToken cancellationToken)
         {
@@ -205,6 +224,25 @@ namespace EasyBilling.Presentation.Controllers
             catch (Exception)
             {
                 return StatusCode(500, "An error occurred while downloading the ANAF response.");
+            }
+        }
+
+        [HttpPost]
+        [Route("CreateCreditNote")]
+        public async Task<IActionResult> CreateCreditNote([FromBody] CreateCreditNoteRequest request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var creditNote = await _invoiceService.CreateCreditNoteAsync(request, cancellationToken);
+                return Ok(creditNote);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while creating the credit note.");
             }
         }
     }

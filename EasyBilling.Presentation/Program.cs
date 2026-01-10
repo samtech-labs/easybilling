@@ -6,6 +6,8 @@ using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Jobs;
 using EasyBilling.Application.Services;
+using EasyBilling.Domain.Models;
+using EasyBilling.Infrastructure.Middleware;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Services;
@@ -111,6 +113,7 @@ builder.Services.AddScoped<AnafStatusCheckJob>();
 builder.Services.AddScoped<IInvoiceAnafSubmissionService, InvoiceAnafSubmissionService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<BlobStorageService>();
+builder.Services.AddScoped<UserContext>();
 
 builder.Services.AddOpenApi();
 
@@ -158,6 +161,7 @@ else
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
+app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

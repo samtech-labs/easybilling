@@ -1,7 +1,8 @@
-﻿using EasyBilling.Infrastructure.Persistence;
+﻿using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Domain.Enums;
 using EasyBilling.Domain.Models;
+using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using EasyBilling.Application.Interfaces.Repositories;
 
 namespace EasyBilling.Infrastructure.Repositories
 {
@@ -20,6 +21,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Company)
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
+                .Include(i => i.OriginalInvoice)
                 .FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
         }
 
@@ -30,6 +32,20 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
                 .Where(i => i.CompanyId == companyId)
+                .Where(i => i.Type == InvoiceType.Invoice)
+                .OrderByDescending(i => i.Date)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<Invoice>> GetAllCreditNotesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
+        {
+            return await _db.Invoices
+                .Include(i => i.Company)
+                .Include(i => i.Client)
+                .Include(i => i.InvoiceLines)
+                .Include(i => i.OriginalInvoice)
+                .Where(i => i.CompanyId == companyId)
+                .Where(i => i.Type == InvoiceType.CreditNote)
                 .OrderByDescending(i => i.Date)
                 .ToListAsync(cancellationToken);
         }
@@ -38,6 +54,7 @@ namespace EasyBilling.Infrastructure.Repositories
         {
             return await _db.Invoices
                 .Where(i => i.CompanyId == companyId)
+                .Where(i => i.Type == InvoiceType.Invoice)
                 .OrderByDescending(i => i.Date)
                 .ThenByDescending(i => i.Number)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -47,6 +64,7 @@ namespace EasyBilling.Infrastructure.Repositories
         {
             return await _db.Invoices
                 .Where(i => i.CompanyId == companyId && i.Series == series)
+                .Where(i => i.Type == InvoiceType.Invoice)
                 .OrderByDescending(i => i.Number)
                 .FirstOrDefaultAsync(cancellationToken);
         }
