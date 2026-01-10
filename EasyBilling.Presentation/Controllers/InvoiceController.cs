@@ -2,6 +2,7 @@ using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
+using EasyBilling.Presentation.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,6 +22,7 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpPost]
         [Route("CreateInvoice")]
+        [Authorize(Policy = Policies.CanCreateInvoice)]
         public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
         {
             try
@@ -116,6 +118,7 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpPost]
         [Route("SendEFactura")]
+        [Authorize(Policy = Policies.CanUseEFactura)]
         public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
         {
             try

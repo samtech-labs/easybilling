@@ -9,17 +9,20 @@ namespace EasyBilling.Application.Services;
 public class MembershipService : IMembershipService
 {
     private readonly IMembershipRepository _membershipRepository;
-    private readonly IUserRepository _userRepository;
-    private readonly IMembershipTypeRepository _membershipTypeRepository;
+    private readonly IUserService _userService;
+    private readonly IInvoiceService _invoiceService;
+    private readonly IMembershipTypeService _membershipTypeService;
 
     public MembershipService(
         IMembershipRepository membershipRepository,
-        IUserRepository userRepository,
-        IMembershipTypeRepository membershipTypeRepository)
+        IUserService userService,
+        IInvoiceService invoiceService,
+        IMembershipTypeService membershipTypeService)
     {
         _membershipRepository = membershipRepository;
-        _userRepository = userRepository;
-        _membershipTypeRepository = membershipTypeRepository;
+        _userService = userService;
+        _invoiceService = invoiceService;
+        _membershipTypeService = membershipTypeService;
     }
 
     public async Task<MembershipResponseDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -42,7 +45,7 @@ public class MembershipService : IMembershipService
 
     public async Task<List<MembershipResponseDto>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        var user = await _userService.GetUserByIdAsync(userId, cancellationToken);
         if (user == null)
         {
             throw new InvalidOperationException($"User with ID '{userId}' not found.");
@@ -61,14 +64,14 @@ public class MembershipService : IMembershipService
     public async Task<MembershipResponseDto> AssignMembershipAsync(AssignMembershipRequest request, CancellationToken cancellationToken = default)
     {
         // Validate user exists
-        var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+        var user = await _userService.GetUserByIdAsync(request.UserId, cancellationToken);
         if (user == null)
         {
             throw new InvalidOperationException($"User with ID '{request.UserId}' not found.");
         }
 
         // Validate membership type exists
-        var membershipType = await _membershipTypeRepository.GetByIdAsync(request.MembershipTypeId, cancellationToken);
+        var membershipType = await _membershipTypeService.GetByIdAsync(request.MembershipTypeId, cancellationToken);
         if (membershipType == null)
         {
             throw new InvalidOperationException($"Membership type with ID '{request.MembershipTypeId}' not found.");
@@ -107,6 +110,85 @@ public class MembershipService : IMembershipService
         }
 
         await _membershipRepository.DeleteAsync(id, cancellationToken);
+    }
+
+    public async Task<bool> HasMembershipActiveAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await _membershipRepository.GetActiveMembershipByUserIdAsync(userId, cancellationToken);
+        return membership != null;
+    }
+
+    public async Task<bool> CanCreateInvoiceAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await _membershipRepository.GetActiveMembershipByUserIdAsync(userId, cancellationToken);
+        if (membership == null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        if (membership.StartDate > now || membership.EndDate < now)
+        {
+            return false;
+        }
+
+        var membershipType = membership.MembershipType;
+
+        if (membershipType == null)
+        {
+            return false;
+        }
+
+        var invoices = await _invoiceService.GetAllForUserByPeriodAsync(userId, membership.StartDate, membership.EndDate, cancellationToken);
+
+        return invoices.Count < membershipType.MaxInvoicesPerMonth;
+    }
+
+    public async Task<bool> CanUseEFacturaAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await _membershipRepository.GetActiveMembershipByUserIdAsync(userId, cancellationToken);
+
+        if (membership == null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+
+        if (membership.StartDate > now || membership.EndDate < now)
+        {
+            return false;
+        }
+
+        var membershipType = membership.MembershipType;
+
+        return membershipType?.EFacturaActive ?? false; 
+    }
+
+    public async Task<int> GetInvoicesCreatedThisMembershipAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await _membershipRepository.GetActiveMembershipByUserIdAsync(userId, cancellationToken);
+
+        if (membership == null)
+        {
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+        if (membership.StartDate > now || membership.EndDate < now)
+        {
+            return 0;
+        }
+
+        var membershipType = membership.MembershipType;
+        if (membershipType == null)
+        {
+            return 0;
+        }
+
+        var invoices = await _invoiceService.GetAllForUserByPeriodAsync(userId, membership.StartDate, membership.EndDate, cancellationToken);
+
+        return invoices.Count;
     }
 
     private static MembershipResponseDto MapToDto(Membership membership)

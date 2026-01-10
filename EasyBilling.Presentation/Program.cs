@@ -9,9 +9,13 @@ using EasyBilling.Application.Services;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Services;
+using EasyBilling.Presentation.Authorization;
+using EasyBilling.Presentation.Authorization.Handlers;
+using EasyBilling.Presentation.Authorization.Requirements;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -112,6 +116,18 @@ builder.Services.AddScoped<IInvoiceAnafSubmissionRepository, InvoiceAnafSubmissi
 builder.Services.AddScoped<AnafStatusCheckJob>();
 builder.Services.AddScoped<IInvoiceAnafSubmissionService, InvoiceAnafSubmissionService>();
 builder.Services.AddScoped<AuthService>();
+
+// Authorization Handlers
+builder.Services.AddScoped<IAuthorizationHandler, InvoiceLimitHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, EFacturaHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ActiveMembershipHandler>();
+
+// Authorization Policies
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(Policies.CanCreateInvoice, policy => policy.Requirements.Add(new InvoiceLimitRequirement()))
+    .AddPolicy(Policies.CanUseEFactura, policy => policy.Requirements.Add(new EFacturaRequirement()))
+    .AddPolicy(Policies.HasActiveMembership, policy => policy.Requirements.Add(new ActiveMembershipRequirement()));
+
 
 builder.Services.AddOpenApi();
 

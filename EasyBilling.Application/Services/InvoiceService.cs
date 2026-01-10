@@ -14,6 +14,7 @@ namespace EasyBilling.Application.Services
     public class InvoiceService(
         IInvoiceRepository invoiceRepository,
         ICompanyService companyService,
+        IUserService userService,
         IClientRepository clientRepository,
         IEFacturaXmlGenerator eFacturaXmlGenerator,
         IInvoiceAnafSubmissionRepository anafSubmissionRepository,
@@ -21,6 +22,7 @@ namespace EasyBilling.Application.Services
     {
         private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
         private readonly ICompanyService _companyService = companyService;
+        private readonly IUserService _userService = userService;
         private readonly IClientRepository _clientRepository = clientRepository;
         private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
         private readonly IInvoiceAnafSubmissionRepository _anafSubmissionRepository = anafSubmissionRepository;
@@ -585,6 +587,18 @@ namespace EasyBilling.Application.Services
             {
                 throw new InvalidOperationException("Failed to download ANAF response.", ex);
             }
+        }
+
+        public async Task<List<Invoice>> GetAllForUserByPeriodAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            var user = await _userService.GetUserByIdAsync(userId, cancellationToken);
+
+            if (user == null)
+            {
+                throw new InvalidOperationException($"User with ID '{userId}' does not exist.");
+            }
+
+            return await _invoiceRepository.GetAllForUserByPeriodAsync(userId, startDate, endDate, cancellationToken);
         }
     }
 }
