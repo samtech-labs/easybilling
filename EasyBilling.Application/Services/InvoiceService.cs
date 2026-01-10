@@ -4,6 +4,7 @@ using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
+using EasyBilling.Domain.Enums;
 using EasyBilling.Domain.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -278,6 +279,19 @@ namespace EasyBilling.Application.Services
             return invoices.Select(MapInvoiceToDto).ToList();
         }
 
+        public async Task<List<InvoiceResponseDto>> GetCreditNotesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var creditNotes = await _invoiceRepository.GetAllCreditNotesByCompanyIdAsync(companyId, cancellationToken);
+
+            return creditNotes.Select(MapInvoiceToDto).ToList();
+        }
+
         public async Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
@@ -495,6 +509,11 @@ namespace EasyBilling.Application.Services
                 TotalAmount = totalAmount,
                 TotalVat = totalVat,
                 GrandTotal = totalAmount + totalVat,
+                Type = invoice.Type,
+                OriginalInvoiceId = invoice.OriginalInvoiceId,
+                OriginalInvoiceNumber = invoice.OriginalInvoice != null
+                    ? $"{invoice.OriginalInvoice.Series} nr. {invoice.OriginalInvoice.Number}"
+                    : null,
                 Company = new CompanyResponseDto
                 {
                     Id = invoice.Company.Id,
@@ -589,6 +608,94 @@ namespace EasyBilling.Application.Services
             }
         }
 
+        public async Task<InvoiceResponseDto> CreateCreditNoteAsync(CreateCreditNoteRequest request, CancellationToken cancellationToken = default)
+        {
+            var originalInvoice = await _invoiceRepository.GetByIdWithDetailsAsync(request.OriginalInvoiceId, cancellationToken);
+
+            if (originalInvoice == null)
+            {
+                throw new InvalidOperationException($"Original invoice with ID '{request.OriginalInvoiceId}' does not exist.");
+            }
+
+            if (originalInvoice.IsCreditNote)
+            {
+                throw new InvalidOperationException("Cannot create a credit note for another credit note.");
+            }
+
+            var series = request.Series ?? originalInvoice.Series;
+            
+            var nextNumber = await _invoiceRepository.GetLastInvoiceBySeriesAsync(originalInvoice.CompanyId, series, cancellationToken);
+            var number = request.Number != null && int.TryParse(request.Number, out var parsedNumber)
+                ? parsedNumber
+                : (nextNumber != null ? nextNumber.Number + 1 : originalInvoice.Number + 1);
+
+            List<InvoiceLine> lines;
+
+            if (request.Lines != null && request.Lines.Any())
+            {
+                lines = request.Lines.Select(line => new InvoiceLine
+                {
+                    Id = Guid.NewGuid(),
+                    InvoiceId = Guid.NewGuid(), // Will be set when creating the credit note
+                    Description = line.Description,
+                    Quantity = line.Quantity,
+                    UnitPrice = line.UnitPrice,
+                    VatRate = line.VatRate > 0 ? line.VatRate : 0,
+                    Unit = line.Unit ?? "buc"
+                }).ToList();
+            } else
+            {
+                lines = originalInvoice.InvoiceLines.Select(l => new InvoiceLine
+                {
+                    Id = Guid.NewGuid(),
+                    InvoiceId = Guid.NewGuid(), // Will be set when creating the credit note
+                    Description = l.Description,
+                    Quantity = l.Quantity,
+                    UnitPrice = l.UnitPrice,
+                    VatRate = l.VatRate,
+                    Unit = l.Unit
+                }).ToList();
+            }
+
+            decimal totalAmount = 0;
+            decimal totalVat = 0;
+
+            foreach (var line in lines)
+            {
+                var vatRate = line.VatRate;
+                var lineTotal = line.Quantity * line.UnitPrice;
+                var lineVat = lineTotal * vatRate / 100;
+                totalAmount += lineTotal;
+                totalVat += lineVat;
+            }
+
+            var creditNote = new Invoice
+            {
+                Id = Guid.NewGuid(),
+                Date = DateTime.UtcNow,
+                Type = InvoiceType.CreditNote,
+                Series = series,
+                Number = number,
+                TotalAmount = totalAmount,
+                Vat = totalVat,
+                CompanyId = originalInvoice.CompanyId,
+                ClientId = originalInvoice.ClientId,
+                OriginalInvoiceId = originalInvoice.Id,
+                InvoiceLines = lines
+            };
+
+            await _invoiceRepository.AddAsync(creditNote, cancellationToken);
+
+            var result = await _invoiceRepository.GetByIdWithDetailsAsync(creditNote.Id, cancellationToken);
+
+            if (result == null)
+            {
+                throw new InvalidOperationException("Failed to retrieve the created credit note.");
+            }
+
+            return MapInvoiceToDto(result);
+        }
+        
         public async Task<List<Invoice>> GetAllForUserByPeriodAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
         {
             var user = await _userService.GetUserByIdAsync(userId, cancellationToken);

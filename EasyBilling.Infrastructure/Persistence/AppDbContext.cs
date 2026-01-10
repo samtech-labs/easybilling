@@ -1,4 +1,5 @@
 ﻿using EasyBilling.Domain.Models;
+using EasyBilling.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EasyBilling.Infrastructure.Persistence
@@ -44,12 +45,26 @@ namespace EasyBilling.Infrastructure.Persistence
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<Invoice>()
-                .HasMany(i => i.InvoiceLines)
-                .WithOne(il => il.Invoice)
-                .HasForeignKey(il => il.InvoiceId)
-                .IsRequired()
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.HasMany(i => i.InvoiceLines)
+                    .WithOne(il => il.Invoice)
+                    .HasForeignKey(il => il.InvoiceId)
+                    .IsRequired()
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(e => e.Type)
+                    .HasConversion<int>()
+                    .HasDefaultValue(InvoiceType.Invoice);
+
+                entity.HasOne(e => e.OriginalInvoice)
+                    .WithMany(e => e.CreditNotes)
+                    .HasForeignKey(e => e.OriginalInvoiceId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => e.OriginalInvoiceId);
+                entity.HasIndex(e => e.Type);
+            });
 
             modelBuilder.Entity<InvoiceAnafSubmission>(entity =>
             {

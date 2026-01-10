@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260108135809_AddCreditNoteSupport")]
+    partial class AddCreditNoteSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -153,6 +156,34 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Companies");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("e11e24c2-8c61-4adb-af89-9464ac44964a"),
+                            Address = "Strada 14 Octombrie 115B, Targu Jiu, Gorj",
+                            Bank = "Revolut Bank UAD",
+                            CUI = "RO49311115",
+                            IBAN = "RO49AAAA1B31007593840000",
+                            IsEFacturaActive = false,
+                            IsVatPayer = false,
+                            Name = "SAMTECH LABS SRL",
+                            RegNumber = "J18/1171/2023",
+                            UserId = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101")
+                        },
+                        new
+                        {
+                            Id = new Guid("40019908-3df7-4764-bbb7-1776e8e23245"),
+                            Address = "Str. Testului 2, Cluj-Napoca, Romania",
+                            Bank = "Banca Transilvania",
+                            CUI = "RO87654321",
+                            IBAN = "RO49BBBB1B31007593840000",
+                            IsEFacturaActive = false,
+                            IsVatPayer = false,
+                            Name = "Demo Client SRL",
+                            RegNumber = "J12/567/2020",
+                            UserId = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303")
+                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
@@ -293,73 +324,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.ToTable("InvoiceLine");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.Membership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("MembershipTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EndDate");
-
-                    b.HasIndex("MembershipTypeId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("Memberships", (string)null);
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.MembershipType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DurationInDays")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("EFacturaActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("MaxInvoicesPerMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("MembershipTypes", (string)null);
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -374,10 +338,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("text");
@@ -385,6 +345,22 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a3f1b2c6-5d7a-4c89-bc36-9e7f2a51d101"),
+                            Email = "admin@gmail.com",
+                            Password = "admin123",
+                            Username = "admin"
+                        },
+                        new
+                        {
+                            Id = new Guid("5b7d8e03-9f3e-4c28-ae10-2a6f7c934303"),
+                            Email = "user@gmail.com",
+                            Password = "user123",
+                            Username = "user"
+                        });
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.AnafToken", b =>
@@ -468,25 +444,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.Membership", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.MembershipType", "MembershipType")
-                        .WithMany()
-                        .HasForeignKey("MembershipTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EasyBilling.Domain.Models.User", "User")
-                        .WithOne("Membership")
-                        .HasForeignKey("EasyBilling.Domain.Models.Membership", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MembershipType");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
                 {
                     b.Navigation("Clients");
@@ -506,8 +463,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("AnafToken");
 
                     b.Navigation("Companies");
-
-                    b.Navigation("Membership");
                 });
 #pragma warning restore 612, 618
         }

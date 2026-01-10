@@ -40,7 +40,7 @@ public class InvoiceAnafSubmissionRepository : IInvoiceAnafSubmissionRepository
     {
         return await _dbContext.InvoiceAnafSubmissions
             .Include(s => s.Invoice)
-                .ThenInclude(i => i.Company)
+            .ThenInclude(i => i.Company)
             .Where(s => s.InvoiceId == invoiceId && s.Status == AnafSubmissionStatus.Ok)
             .OrderByDescending(s => s.UploadedAt)
             .FirstOrDefaultAsync(ct);

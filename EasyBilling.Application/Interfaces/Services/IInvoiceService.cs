@@ -11,11 +11,16 @@ namespace EasyBilling.Application.Interfaces.Services
         Task<InvoiceResponseDto> GetInvoiceByIdAsync(Guid invoiceId, Guid companyId, CancellationToken cancellationToken = default);
         Task<Invoice?> GetInvoiceAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<List<InvoiceResponseDto>> GetInvoicesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+        Task<List<InvoiceResponseDto>> GetCreditNotesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default);
         Task<byte[]> GenerateInvoicePdfAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default);
         Task<EFacturaDownloadResponse> DownloadAnafResponseAsync(Guid invoiceId, CancellationToken cancellationToken = default);
+<<<<<<< HEAD
         Task<List<Invoice>> GetAllForUserByPeriodAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+=======
+        Task<InvoiceResponseDto> CreateCreditNoteAsync(CreateCreditNoteRequest request, CancellationToken cancellationToken = default);
+>>>>>>> main
     }
 }
