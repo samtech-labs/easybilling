@@ -18,6 +18,13 @@ namespace EasyBilling.Application.Services
             return await _companyRepository.GetAllCompaniesByUserAsync(userId);
         }
 
+        public async Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(
+            Guid userId,
+            CompanyPaginationFilter filter)
+        {
+            return await _companyRepository.GetCompaniesByUserPaginatedAsync(userId, filter);
+        }
+
         public async Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui)
         {
             var cleanCui = cui.Replace("RO", "").Replace(" ", "").Trim();

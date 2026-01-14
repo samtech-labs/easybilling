@@ -1,4 +1,4 @@
-using EasyBilling.ANAFIntegration.EFactura.Interfaces;
+using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
@@ -59,10 +59,41 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet]
         [Route("GetAllInvoices")]
-        public async Task<IActionResult> GetAllInvoices(Guid companyId, CancellationToken cancellationToken)
+        public async Task<IActionResult> GetAllInvoices(
+            [FromQuery] Guid companyId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] string? sortBy = null,
+            [FromQuery] string sortOrder = "desc",
+            [FromQuery] DateTime? dateFrom = null,
+            [FromQuery] DateTime? dateTo = null,
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
+                {
+                    var filter = new InvoicePaginationFilter
+                    {
+                        PageNumber = pageNumber,
+                        PageSize = pageSize,
+                        SearchTerm = searchTerm,
+                        SortBy = sortBy,
+                        SortOrder = sortOrder,
+                        DateFrom = dateFrom,
+                        DateTo = dateTo
+                    };
+
+                    if (!filter.IsValid)
+                    {
+                        return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
+                    }
+
+                    var result = await _invoiceService.GetInvoicesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
+                    return Ok(result);
+                }
+
                 var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
                 return Ok(invoices);
             }
@@ -72,16 +103,47 @@ namespace EasyBilling.Presentation.Controllers
             }
             catch (Exception)
             {
-               return StatusCode(500, "An error occurred while retrieving invoices.");
+                return StatusCode(500, "An error occurred while retrieving invoices.");
             }
         }
 
         [HttpGet]
         [Route("GetAllCreditNotes")]
-        public async Task<IActionResult> GetAllCreditNotes(Guid companyId, CancellationToken cancellationToken)
+        public async Task<IActionResult> GetAllCreditNotes(
+            [FromQuery] Guid companyId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] string? sortBy = null,
+            [FromQuery] string sortOrder = "desc",
+            [FromQuery] DateTime? dateFrom = null,
+            [FromQuery] DateTime? dateTo = null,
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
+                {
+                    var filter = new InvoicePaginationFilter
+                    {
+                        PageNumber = pageNumber,
+                        PageSize = pageSize,
+                        SearchTerm = searchTerm,
+                        SortBy = sortBy,
+                        SortOrder = sortOrder,
+                        DateFrom = dateFrom,
+                        DateTo = dateTo
+                    };
+
+                    if (!filter.IsValid)
+                    {
+                        return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
+                    }
+
+                    var result = await _invoiceService.GetCreditNotesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
+                    return Ok(result);
+                }
+
                 var creditNotes = await _invoiceService.GetCreditNotesByCompanyIdAsync(companyId, cancellationToken);
                 return Ok(creditNotes);
             }
@@ -91,7 +153,7 @@ namespace EasyBilling.Presentation.Controllers
             }
             catch (Exception)
             {
-               return StatusCode(500, "An error occurred while retrieving credit notes.");
+                return StatusCode(500, "An error occurred while retrieving credit notes.");
             }
         }
 
