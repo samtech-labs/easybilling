@@ -2,16 +2,21 @@ using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.Application.Interfaces.Services
+namespace EasyBilling.Application.Interfaces.Services;
+
+public interface ICompanyService
 {
-    public interface ICompanyService
-    {
-        Task<List<Company>> GetCompaniesByUserAsync(Guid userId);
-        Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter);
-        Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest);
-        Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui);
-        Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);
-        Task DeleteCompanyAsync(Guid companyId);
-        Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default);
-    }
+    Task<List<Company>> GetCompaniesByUserAsync(Guid userId);
+
+    Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter);
+
+    Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest);
+
+    Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui);
+
+    Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task DeleteCompanyAsync(Guid companyId);
+
+    Task<Company?> GetCompanyByCifAsync(string cif, CancellationToken cancellationToken = default);
 }

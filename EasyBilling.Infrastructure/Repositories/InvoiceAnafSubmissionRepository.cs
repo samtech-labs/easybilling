@@ -1,4 +1,5 @@
 ﻿using EasyBilling.Application.Interfaces.Repositories;
+using EasyBilling.Domain.Enums;
 using EasyBilling.Domain.Models;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

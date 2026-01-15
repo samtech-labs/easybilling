@@ -1,18 +1,17 @@
 using EasyBilling.ANAFIntegration.PublicGeneralAPI.Models;
 
-namespace EasyBilling.ANAFIntegration
+namespace EasyBilling.ANAFIntegration;
+
+public static class ANAFIntegration
 {
-    public static class ANAFIntegration
+    private static readonly PublicGeneralAPI.PublicGeneralAPI _publicGeneralAPI = new();
+    private static readonly EFactura.EFactura _eFactura = new();
+
+    public static PublicGeneralAPI.PublicGeneralAPI PublicGeneralAPI => _publicGeneralAPI;
+    public static EFactura.EFactura EFactura => _eFactura;
+
+    public static async Task<CompanyDetails?> GetCompanyDetails(string cui, DateTime date)
     {
-        private static readonly PublicGeneralAPI.PublicGeneralAPI _publicGeneralAPI = new();
-        private static readonly EFactura.EFactura _eFactura = new();
-
-        public static PublicGeneralAPI.PublicGeneralAPI PublicGeneralAPI => _publicGeneralAPI;
-        public static EFactura.EFactura EFactura => _eFactura;
-
-        public static async Task<CompanyDetails?> GetCompanyDetails(string cui, DateTime date)
-        {
-            return await _publicGeneralAPI.GetCompanyDetailsAsync(cui, date);
-        }
+        return await _publicGeneralAPI.GetCompanyDetailsAsync(cui, date);
     }
 }

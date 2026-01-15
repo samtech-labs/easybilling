@@ -1,9 +1,6 @@
-﻿using EasyBilling.Domain.Models;
+﻿namespace EasyBilling.Application.Interfaces.Helpers;
 
-namespace EasyBilling.Application.Interfaces.Helpers
+public interface IAnafIntegrationHelper
 {
-    public interface IAnafIntegrationHelper
-    {
-        HttpClient CreateAuthenticatedClient(string accessToken);
-    }
+    HttpClient CreateAuthenticatedClient(string accessToken);
 }

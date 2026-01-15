@@ -5,281 +5,280 @@ using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EasyBilling.Presentation.Controllers
+namespace EasyBilling.Presentation.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+[Authorize]
+public class InvoiceController(
+    IInvoiceService invoiceService,
+    IInvoiceRepository invoiceRepository,
+    IAnafIntegrationService anafIntegrationService) : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    [Authorize]
-    public class InvoiceController(
-        IInvoiceService invoiceService,
-        IInvoiceRepository invoiceRepository,
-        IAnafIntegrationService anafIntegrationService) : ControllerBase
+    private readonly IInvoiceService _invoiceService = invoiceService;
+    private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
+    private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
+
+    [HttpPost]
+    [Route("CreateInvoice")]
+    public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
     {
-        private readonly IInvoiceService _invoiceService = invoiceService;
-        private readonly IInvoiceRepository _invoiceRepository = invoiceRepository;
-        private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
-
-        [HttpPost]
-        [Route("CreateInvoice")]
-        public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
+        try
         {
-            try
-            {
-                var invoice = await _invoiceService.CreateInvoiceAsync(request, cancellationToken);
-                return Ok(invoice);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while creating the invoice.");
-            }
+            var invoice = await _invoiceService.CreateInvoiceAsync(request, cancellationToken);
+            return Ok(invoice);
         }
-
-        [HttpGet]
-        [Route("GetInvoice")]
-        public async Task<IActionResult> GetInvoice(Guid invoiceId, Guid companyId, CancellationToken cancellationToken)
+        catch (InvalidOperationException ex)
         {
-            try
-            {
-                var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, companyId, cancellationToken);
-                return Ok(invoice);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while retrieving the invoice.");
-            }
+            return BadRequest(new { message = ex.Message });
         }
-
-        [HttpGet]
-        [Route("GetAllInvoices")]
-        public async Task<IActionResult> GetAllInvoices(
-            [FromQuery] Guid companyId,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10,
-            [FromQuery] string? searchTerm = null,
-            [FromQuery] string? sortBy = null,
-            [FromQuery] string sortOrder = "desc",
-            [FromQuery] DateTime? dateFrom = null,
-            [FromQuery] DateTime? dateTo = null,
-            CancellationToken cancellationToken = default)
+        catch (Exception)
         {
-            try
+            return StatusCode(500, "An error occurred while creating the invoice.");
+        }
+    }
+
+    [HttpGet]
+    [Route("GetInvoice")]
+    public async Task<IActionResult> GetInvoice(Guid invoiceId, Guid companyId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(invoiceId, companyId, cancellationToken);
+            return Ok(invoice);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while retrieving the invoice.");
+        }
+    }
+
+    [HttpGet]
+    [Route("GetAllInvoices")]
+    public async Task<IActionResult> GetAllInvoices(
+        [FromQuery] Guid companyId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string sortOrder = "desc",
+        [FromQuery] DateTime? dateFrom = null,
+        [FromQuery] DateTime? dateTo = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
             {
-                if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
+                var filter = new InvoicePaginationFilter
                 {
-                    var filter = new InvoicePaginationFilter
-                    {
-                        PageNumber = pageNumber,
-                        PageSize = pageSize,
-                        SearchTerm = searchTerm,
-                        SortBy = sortBy,
-                        SortOrder = sortOrder,
-                        DateFrom = dateFrom,
-                        DateTo = dateTo
-                    };
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    SearchTerm = searchTerm,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder,
+                    DateFrom = dateFrom,
+                    DateTo = dateTo
+                };
 
-                    if (!filter.IsValid)
-                    {
-                        return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
-                    }
-
-                    var result = await _invoiceService.GetInvoicesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
-                    return Ok(result);
+                if (!filter.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
                 }
 
-                var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
-                return Ok(invoices);
+                var result = await _invoiceService.GetInvoicesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
+                return Ok(result);
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while retrieving invoices.");
-            }
+
+            var invoices = await _invoiceService.GetInvoicesByCompanyIdAsync(companyId, cancellationToken);
+            return Ok(invoices);
         }
-
-        [HttpGet]
-        [Route("GetAllCreditNotes")]
-        public async Task<IActionResult> GetAllCreditNotes(
-            [FromQuery] Guid companyId,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10,
-            [FromQuery] string? searchTerm = null,
-            [FromQuery] string? sortBy = null,
-            [FromQuery] string sortOrder = "desc",
-            [FromQuery] DateTime? dateFrom = null,
-            [FromQuery] DateTime? dateTo = null,
-            CancellationToken cancellationToken = default)
+        catch (InvalidOperationException ex)
         {
-            try
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while retrieving invoices.");
+        }
+    }
+
+    [HttpGet]
+    [Route("GetAllCreditNotes")]
+    public async Task<IActionResult> GetAllCreditNotes(
+        [FromQuery] Guid companyId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string sortOrder = "desc",
+        [FromQuery] DateTime? dateFrom = null,
+        [FromQuery] DateTime? dateTo = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
             {
-                if (pageNumber != 1 || pageSize != 10 || !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" || dateFrom.HasValue || dateTo.HasValue)
+                var filter = new InvoicePaginationFilter
                 {
-                    var filter = new InvoicePaginationFilter
-                    {
-                        PageNumber = pageNumber,
-                        PageSize = pageSize,
-                        SearchTerm = searchTerm,
-                        SortBy = sortBy,
-                        SortOrder = sortOrder,
-                        DateFrom = dateFrom,
-                        DateTo = dateTo
-                    };
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    SearchTerm = searchTerm,
+                    SortBy = sortBy,
+                    SortOrder = sortOrder,
+                    DateFrom = dateFrom,
+                    DateTo = dateTo
+                };
 
-                    if (!filter.IsValid)
-                    {
-                        return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
-                    }
-
-                    var result = await _invoiceService.GetCreditNotesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
-                    return Ok(result);
+                if (!filter.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
                 }
 
-                var creditNotes = await _invoiceService.GetCreditNotesByCompanyIdAsync(companyId, cancellationToken);
-                return Ok(creditNotes);
+                var result = await _invoiceService.GetCreditNotesByCompanyIdPaginatedAsync(companyId, filter, cancellationToken);
+                return Ok(result);
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while retrieving credit notes.");
-            }
+
+            var creditNotes = await _invoiceService.GetCreditNotesByCompanyIdAsync(companyId, cancellationToken);
+            return Ok(creditNotes);
         }
-
-        [HttpGet]
-        [Route("GetLastInvoiceNumber")]
-        public async Task<IActionResult> GetLastInvoiceNumber(Guid companyId, CancellationToken cancellationToken)
+        catch (InvalidOperationException ex)
         {
-            try
-            {
-                var lastInvoiceNumber = await _invoiceService.GetLastInvoiceNumberAsync(companyId, cancellationToken);
-                return Ok(lastInvoiceNumber);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while retrieving the last invoice number.");
-            }
+            return BadRequest(new { message = ex.Message });
         }
-
-        [HttpGet]
-        [Route("GeneratePdf")]
-        public async Task<IActionResult> GeneratePdf(Guid invoiceId, CancellationToken cancellationToken)
+        catch (Exception)
         {
-            try
-            {
-                var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(invoiceId, cancellationToken);
-                return File(pdfBytes, "application/pdf", "invoice.pdf");
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while generating the invoice PDF.");
-            }
+            return StatusCode(500, "An error occurred while retrieving credit notes.");
         }
+    }
 
-        [HttpPost]
-        [Route("SendEFactura")]
-        public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
+    [HttpGet]
+    [Route("GetLastInvoiceNumber")]
+    public async Task<IActionResult> GetLastInvoiceNumber(Guid companyId, CancellationToken cancellationToken)
+    {
+        try
         {
-            try
-            {
-                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
-                if (invoice == null)
-                {
-                    return NotFound(new { message = "Invoice not found." });
-                }
-                var uploadInvoiceResult = await _anafIntegrationService.UploadXmlToAnaf(invoiceId, cancellationToken);
-                return Ok(uploadInvoiceResult);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while sending the invoice to ANAF.");
-            }
+            var lastInvoiceNumber = await _invoiceService.GetLastInvoiceNumberAsync(companyId, cancellationToken);
+            return Ok(lastInvoiceNumber);
         }
-
-        [HttpGet]
-        [Route("GetAnafSubmissionStatus")]
-        public async Task<IActionResult> GetAnafSubmissionStatus(Guid invoiceId, CancellationToken cancellationToken)
+        catch (InvalidOperationException ex)
         {
-            try
-            {
-                var status = await _invoiceService.GetAnafSubmissionStatusAsync(invoiceId, cancellationToken);
-                return Ok(status);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while retrieving the ANAF submission status.");
-            }
+            return BadRequest(new { message = ex.Message });
         }
-
-        [HttpGet]
-        [Route("DownloadAnafResponse")]
-        public async Task<IActionResult> DownloadAnafResponse(Guid invoiceId, CancellationToken cancellationToken)
+        catch (Exception)
         {
-            try
-            {
-                var downloadResponse = await _invoiceService.DownloadAnafResponseAsync(invoiceId, cancellationToken);
-
-                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
-                var fileName = invoice != null
-                    ? $"ANAF_Response_{invoice.Series}_{invoice.Number}.zip"
-                    : $"ANAF_Response_{invoiceId}.zip";
-
-                return File(downloadResponse.ZipContent, "application/zip", fileName);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while downloading the ANAF response.");
-            }
+            return StatusCode(500, "An error occurred while retrieving the last invoice number.");
         }
+    }
 
-        [HttpPost]
-        [Route("CreateCreditNote")]
-        public async Task<IActionResult> CreateCreditNote([FromBody] CreateCreditNoteRequest request, CancellationToken cancellationToken)
+    [HttpGet]
+    [Route("GeneratePdf")]
+    public async Task<IActionResult> GeneratePdf(Guid invoiceId, CancellationToken cancellationToken)
+    {
+        try
         {
-            try
+            var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(invoiceId, cancellationToken);
+            return File(pdfBytes, "application/pdf", "invoice.pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while generating the invoice PDF.");
+        }
+    }
+
+    [HttpPost]
+    [Route("SendEFactura")]
+    public async Task<IActionResult> SendEFactura(Guid invoiceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+            if (invoice == null)
             {
-                var creditNote = await _invoiceService.CreateCreditNoteAsync(request, cancellationToken);
-                return Ok(creditNote);
+                return NotFound(new { message = "Invoice not found." });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "An error occurred while creating the credit note.");
-            }
+            var uploadInvoiceResult = await _anafIntegrationService.UploadXmlToAnaf(invoiceId, cancellationToken);
+            return Ok(uploadInvoiceResult);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while sending the invoice to ANAF.");
+        }
+    }
+
+    [HttpGet]
+    [Route("GetAnafSubmissionStatus")]
+    public async Task<IActionResult> GetAnafSubmissionStatus(Guid invoiceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var status = await _invoiceService.GetAnafSubmissionStatusAsync(invoiceId, cancellationToken);
+            return Ok(status);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while retrieving the ANAF submission status.");
+        }
+    }
+
+    [HttpGet]
+    [Route("DownloadAnafResponse")]
+    public async Task<IActionResult> DownloadAnafResponse(Guid invoiceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var downloadResponse = await _invoiceService.DownloadAnafResponseAsync(invoiceId, cancellationToken);
+
+            var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+            var fileName = invoice != null
+                ? $"ANAF_Response_{invoice.Series}_{invoice.Number}.zip"
+                : $"ANAF_Response_{invoiceId}.zip";
+
+            return File(downloadResponse.ZipContent, "application/zip", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while downloading the ANAF response.");
+        }
+    }
+
+    [HttpPost]
+    [Route("CreateCreditNote")]
+    public async Task<IActionResult> CreateCreditNote([FromBody] CreateCreditNoteRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var creditNote = await _invoiceService.CreateCreditNoteAsync(request, cancellationToken);
+            return Ok(creditNote);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "An error occurred while creating the credit note.");
         }
     }
 }
