@@ -2,54 +2,94 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EasyBilling.ANAFIntegration.PublicGeneralAPI.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyBilling.ANAFIntegration.PublicGeneralAPI;
 
 public class PublicGeneralAPI
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger _logger;
     private const string BaseUrl = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
 
-    public PublicGeneralAPI()
+    public PublicGeneralAPI(HttpClient httpClient, ILogger? logger = null)
     {
-        _httpClient = new HttpClient();
-    }
-
-    public PublicGeneralAPI(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _logger = logger ?? NullLoggerFactory.Instance.CreateLogger("PublicGeneralAPI");
     }
 
     public async Task<CompanyDetails?> GetCompanyDetailsAsync(string cui, DateTime date)
     {
-        var cleanCui = cui.Replace("RO", "").Replace(" ", "").Trim();
+        _logger.LogInformation("Fetching company details from ANAF - CUI: {CUI}, Date: {Date}",
+            cui, date.ToString("yyyy-MM-dd"));
 
-        if (!long.TryParse(cleanCui, out var cuiNumber))
-            throw new ArgumentException("Invalid CUI format", nameof(cui));
-
-        var requestBody = new[]
+        try
         {
-            new
+            if (string.IsNullOrWhiteSpace(cui))
             {
-                cui = cuiNumber,
-                data = date.ToString("yyyy-MM-dd")
+                _logger.LogWarning("GetCompanyDetailsAsync called with empty CUI");
+                return null;
             }
-        };
 
-        var response = await _httpClient.PostAsJsonAsync(BaseUrl, requestBody);
-        response.EnsureSuccessStatusCode();
+            var cleanCui = cui.Replace("RO", "").Replace(" ", "").Trim();
+            _logger.LogDebug("Cleaned CUI: {CleanCUI} (original: {OriginalCUI})", cleanCui, cui);
 
-        var jsonResponse = await response.Content.ReadAsStringAsync();
-        var anafResponse = JsonSerializer.Deserialize<AnafResponse>(jsonResponse, new JsonSerializerOptions
+            if (!long.TryParse(cleanCui, out var cuiNumber))
+            {
+                _logger.LogWarning("Invalid CUI format: {CUI}", cleanCui);
+                throw new ArgumentException("Invalid CUI format", nameof(cui));
+            }
+
+            _logger.LogDebug("CUI parsed successfully: {CUINumber}", cuiNumber);
+
+            var requestBody = new[]
+            {
+                new
+                {
+                    cui = cuiNumber,
+                    data = date.ToString("yyyy-MM-dd")
+                }
+            };
+
+            _logger.LogDebug("Sending request to ANAF API - BaseUrl: {BaseUrl}", BaseUrl);
+
+            var response = await _httpClient.PostAsJsonAsync(BaseUrl, requestBody);
+
+            _logger.LogDebug("Received response from ANAF API - StatusCode: {StatusCode}", response.StatusCode);
+
+            response.EnsureSuccessStatusCode();
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("ANAF API response received - Length: {ResponseLength} characters", jsonResponse.Length);
+
+            var anafResponse = JsonSerializer.Deserialize<AnafResponse>(jsonResponse, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            var found = anafResponse?.Found?.FirstOrDefault();
+            if (found?.DateGenerale == null)
+            {
+                _logger.LogWarning("No company found in ANAF response for CUI: {CUI}", cleanCui);
+                return null;
+            }
+
+            _logger.LogDebug("Company data found in ANAF response - Name: {CompanyName}, CUI: {CUI}",
+                found.DateGenerale?.Denumire, cleanCui);
+
+            var companyDetails = MapToCompanyDetails(found);
+
+            _logger.LogInformation("Company details successfully mapped from ANAF response - Name: {CompanyName}, IsVatPayer: {IsVatPayer}, IsEFacturaActive: {IsEFacturaActive}",
+                companyDetails.Name, companyDetails.IsVatPayer, companyDetails.IsEFacturaActive);
+
+            return companyDetails;
+        }
+        catch (Exception ex)
         {
-            PropertyNameCaseInsensitive = true
-        });
-
-        var found = anafResponse?.Found?.FirstOrDefault();
-        if (found?.DateGenerale == null)
-            return null;
-
-        return MapToCompanyDetails(found);
+            _logger.LogError(ex, "Error fetching company details from ANAF for CUI: {CUI}", cui);
+            throw;
+        }
     }
 
     private static CompanyDetails MapToCompanyDetails(AnafCompanyResult result)
@@ -161,4 +201,3 @@ public class PublicGeneralAPI
         return DateTime.TryParse(dateStr, out var date) ? date : null;
     }
 }
-

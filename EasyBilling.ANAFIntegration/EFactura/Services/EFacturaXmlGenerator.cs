@@ -2,6 +2,8 @@
 using EasyBilling.ANAFIntegration.EFactura.Interfaces;
 using EasyBilling.Domain.Enums;
 using EasyBilling.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
@@ -15,42 +17,111 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     private static readonly XNamespace NS_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
     private static readonly XNamespace NS_CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
 
+    private readonly ILogger _logger;
+
+    public EFacturaXmlGenerator()
+    {
+        _logger = NullLoggerFactory.Instance.CreateLogger("EFacturaXmlGenerator");
+    }
+
+    public EFacturaXmlGenerator(ILogger? logger = null)
+    {
+        _logger = logger ?? NullLoggerFactory.Instance.CreateLogger("EFacturaXmlGenerator");
+    }
 
     public string GenerateXml(Invoice invoice)
     {
-        if (invoice.Company == null)
-            throw new ArgumentException("Invoice must have Company information loaded");
+        _logger.LogInformation("Generating e-Factura XML for invoice {InvoiceId} - Type: {InvoiceType}, Series: {Series} Nr. {Number}",
+            invoice.Id, invoice.Type, invoice.Series, invoice.Number);
 
-        if (invoice.Client == null)
-            throw new ArgumentException("Invoice must have Client information loaded");
+        try
+        {
+            if (invoice.Company == null)
+            {
+                _logger.LogError("Invoice {InvoiceId} missing Company information", invoice.Id);
+                throw new ArgumentException("Invoice must have Company information loaded");
+            }
 
-        if (invoice.Type == InvoiceType.CreditNote && invoice.OriginalInvoice == null)
-            throw new ArgumentException("Credit Note must have OriginalInvoice information loaded");
+            if (invoice.Client == null)
+            {
+                _logger.LogError("Invoice {InvoiceId} missing Client information", invoice.Id);
+                throw new ArgumentException("Invoice must have Client information loaded");
+            }
 
-        XElement rootElement = invoice.Type == InvoiceType.CreditNote
-            ? CreateCreditNoteElement(invoice)
-            : CreateInvoiceElement(invoice);
+            if (invoice.Type == InvoiceType.CreditNote && invoice.OriginalInvoice == null)
+            {
+                _logger.LogError("Credit Note {InvoiceId} missing OriginalInvoice information", invoice.Id);
+                throw new ArgumentException("Credit Note must have OriginalInvoice information loaded");
+            }
 
-        var doc = new XDocument(
-            new XDeclaration("1.0", "UTF-8", null),
-            rootElement
-        );
+            _logger.LogDebug("Invoice validation passed - Company: {CompanyName}, Client: {ClientName}, LineCount: {LineCount}",
+                invoice.Company.Name, invoice.Client.Name, invoice.InvoiceLines?.Count ?? 0);
 
-        return doc.ToString();
+            XElement rootElement = invoice.Type == InvoiceType.CreditNote
+                ? CreateCreditNoteElement(invoice)
+                : CreateInvoiceElement(invoice);
+
+            _logger.LogDebug("XML root element created for invoice {InvoiceId}", invoice.Id);
+
+            var doc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                rootElement
+            );
+
+            var xmlString = doc.ToString();
+            _logger.LogInformation("e-Factura XML successfully generated for invoice {InvoiceId}, size: {XmlSize} characters",
+                invoice.Id, xmlString.Length);
+
+            return xmlString;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating e-Factura XML for invoice {InvoiceId}", invoice.Id);
+            throw;
+        }
     }
 
     public void GenerateXmlFile(Invoice invoice, string filePath)
     {
-        var xml = GenerateXml(invoice);
-        File.WriteAllText(filePath, xml, Encoding.UTF8);
+        _logger.LogInformation("Generating XML file for invoice {InvoiceId} at path: {FilePath}",
+            invoice.Id, filePath);
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                _logger.LogWarning("GenerateXmlFile called with empty file path");
+                throw new ArgumentException("File path cannot be empty", nameof(filePath));
+            }
+
+            _logger.LogDebug("Generating XML content for invoice {InvoiceId}", invoice.Id);
+            var xml = GenerateXml(invoice);
+
+            _logger.LogDebug("Writing XML to file: {FilePath}, size: {XmlSize} characters", filePath, xml.Length);
+            File.WriteAllText(filePath, xml, Encoding.UTF8);
+
+            _logger.LogInformation("XML file successfully written for invoice {InvoiceId} at {FilePath}",
+                invoice.Id, filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error writing XML file for invoice {InvoiceId} at {FilePath}",
+                invoice.Id, filePath);
+            throw;
+        }
     }
 
     #region Invoice (380)
 
     private XElement CreateInvoiceElement(Invoice invoice)
     {
+        _logger.LogDebug("Creating invoice element (type 380) for invoice {InvoiceId}", invoice.Id);
+
         var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
         var dueDate = invoice.DueDate ?? invoice.Date;
+
+        _logger.LogDebug("Calculated invoice totals - Amount: {Amount}, Tax: {Tax}, TaxGroups: {TaxGroupCount}",
+            lineExtensionTotal, taxTotal, taxGroups.Count);
 
         var elements = new List<object?>
         {
@@ -72,18 +143,27 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
         elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal));
         elements.AddRange(CreateInvoiceLines(invoice.InvoiceLines));
 
+        _logger.LogDebug("Invoice element created with {ElementCount} child elements", elements.Count);
+
         return new XElement(NS_INVOICE + "Invoice", elements.Where(e => e != null));
     }
 
     private IEnumerable<XElement> CreateInvoiceLines(ICollection<InvoiceLine>? lines)
     {
         if (lines == null || !lines.Any())
+        {
+            _logger.LogDebug("No invoice lines to process");
             yield break;
+        }
+
+        _logger.LogDebug("Creating {LineCount} invoice line elements", lines.Count);
 
         var lineNumber = 1;
         foreach (var line in lines)
         {
             var lineTotal = line.Quantity * line.UnitPrice;
+            _logger.LogDebug("Processing line {LineNumber} - Description: {Description}, Quantity: {Quantity}, UnitPrice: {UnitPrice}, VatRate: {VatRate}",
+                lineNumber, line.Description, line.Quantity, line.UnitPrice, line.VatRate);
 
             yield return new XElement(NS_CAC + "InvoiceLine",
                 new XElement(NS_CBC + "ID", lineNumber.ToString()),
@@ -108,6 +188,8 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
             lineNumber++;
         }
+
+        _logger.LogDebug("Invoice lines creation completed");
     }
 
     #endregion
@@ -116,7 +198,13 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
     private XElement CreateCreditNoteElement(Invoice invoice)
     {
+        _logger.LogDebug("Creating credit note element (type 381) for invoice {InvoiceId}, OriginalInvoiceId: {OriginalInvoiceId}",
+            invoice.Id, invoice.OriginalInvoiceId);
+
         var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
+
+        _logger.LogDebug("Calculated credit note totals - Amount: {Amount}, Tax: {Tax}, TaxGroups: {TaxGroupCount}",
+            lineExtensionTotal, taxTotal, taxGroups.Count);
 
         var elements = new List<object?>
         {
@@ -138,11 +226,16 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
         elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal));
         elements.AddRange(CreateCreditNoteLines(invoice.InvoiceLines));
 
+        _logger.LogDebug("Credit note element created with {ElementCount} child elements", elements.Count);
+
         return new XElement(NS_CREDIT_NOTE + "CreditNote", elements.Where(e => e != null));
     }
 
     private XElement CreateBillingReference(Invoice originalInvoice)
     {
+        _logger.LogDebug("Creating billing reference for original invoice {OriginalInvoiceId} - Series: {Series} Nr. {Number}",
+            originalInvoice.Id, originalInvoice.Series, originalInvoice.Number);
+
         return new XElement(NS_CAC + "BillingReference",
             new XElement(NS_CAC + "InvoiceDocumentReference",
                 new XElement(NS_CBC + "ID", $"{originalInvoice.Series} nr. {originalInvoice.Number}"),
@@ -154,12 +247,19 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     private IEnumerable<XElement> CreateCreditNoteLines(ICollection<InvoiceLine>? lines)
     {
         if (lines == null || !lines.Any())
+        {
+            _logger.LogDebug("No credit note lines to process");
             yield break;
+        }
+
+        _logger.LogDebug("Creating {LineCount} credit note line elements", lines.Count);
 
         var lineNumber = 1;
         foreach (var line in lines)
         {
             var lineTotal = line.Quantity * line.UnitPrice;
+            _logger.LogDebug("Processing credit note line {LineNumber} - Description: {Description}, Quantity: {Quantity}, UnitPrice: {UnitPrice}, VatRate: {VatRate}",
+                lineNumber, line.Description, line.Quantity, line.UnitPrice, line.VatRate);
 
             yield return new XElement(NS_CAC + "CreditNoteLine",
                 new XElement(NS_CBC + "ID", lineNumber.ToString()),
@@ -184,6 +284,8 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
             lineNumber++;
         }
+
+        _logger.LogDebug("Credit note lines creation completed");
     }
 
     #endregion
@@ -192,9 +294,15 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
     private XElement CreateSupplierParty(Company company)
     {
+        _logger.LogDebug("Creating supplier party element for company {CompanyId} - Name: {CompanyName}, CUI: {CUI}",
+            company.Id, company.Name, company.CUI);
+
         var cui = FormatCUI(company.CUI);
         var countyCode = LocationHelper.GetCountyCode(company.County);
         var city = LocationHelper.NormalizeCity(company.City);
+
+        _logger.LogDebug("Formatted company data - CUI: {FormattedCUI}, CountyCode: {CountyCode}, City: {City}",
+            cui, countyCode, city);
 
         return new XElement(NS_CAC + "AccountingSupplierParty",
             new XElement(NS_CAC + "Party",
@@ -218,9 +326,15 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
     private XElement CreateCustomerParty(Client client)
     {
+        _logger.LogDebug("Creating customer party element for client {ClientId} - Name: {ClientName}, CUI: {CUI}",
+            client.Id, client.Name, client.CUI);
+
         var cui = FormatCUI(client.CUI);
         var countyCode = LocationHelper.GetCountyCode(client.County);
         var city = LocationHelper.NormalizeCity(client.City);
+
+        _logger.LogDebug("Formatted client data - CUI: {FormattedCUI}, CountyCode: {CountyCode}, City: {City}",
+            cui, countyCode, city);
 
         return new XElement(NS_CAC + "AccountingCustomerParty",
             new XElement(NS_CAC + "Party",
@@ -245,6 +359,9 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
     private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups)
     {
+        _logger.LogDebug("Creating tax total element - TotalTax: {TotalTax}, TaxGroups: {TaxGroupCount}",
+            totalTax, taxGroups.Count);
+
         var taxSubtotals = taxGroups.Select(g =>
             new XElement(NS_CAC + "TaxSubtotal",
                 new XElement(NS_CBC + "TaxableAmount",
@@ -272,6 +389,9 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     {
         var totalWithTax = lineExtensionTotal + taxTotal;
 
+        _logger.LogDebug("Creating legal monetary total - LineExtensionTotal: {LineExtensionTotal}, TaxTotal: {TaxTotal}, TotalWithTax: {TotalWithTax}",
+            lineExtensionTotal, taxTotal, totalWithTax);
+
         return new XElement(NS_CAC + "LegalMonetaryTotal",
             new XElement(NS_CBC + "LineExtensionAmount",
                 new XAttribute("currencyID", "RON"),
@@ -291,6 +411,9 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
     private (decimal lineExtensionTotal, decimal taxTotal, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups)
         CalculateTotals(Invoice invoice)
     {
+        _logger.LogDebug("Calculating totals for invoice with {LineCount} lines",
+            invoice.InvoiceLines?.Count ?? 0);
+
         decimal lineExtensionTotal = 0;
         var taxGroups = new Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)>();
 
@@ -311,6 +434,9 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
         }
 
         var taxTotal = taxGroups.Values.Sum(g => g.taxAmount);
+
+        _logger.LogDebug("Totals calculated - LineExtensionTotal: {LineExtensionTotal}, TaxTotal: {TaxTotal}",
+            lineExtensionTotal, taxTotal);
 
         return (lineExtensionTotal, taxTotal, taxGroups);
     }
@@ -360,4 +486,3 @@ public class EFacturaXmlGenerator : IEFacturaXmlGenerator
 
     #endregion
 }
-
