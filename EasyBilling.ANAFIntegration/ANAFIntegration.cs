@@ -6,7 +6,7 @@ namespace EasyBilling.ANAFIntegration;
 
 public static class ANAFIntegration
 {
-    private static readonly PublicGeneralAPI.PublicGeneralAPI _publicGeneralAPI;
+    private static readonly PublicGeneralAPI.PublicGeneralAPI _publicGeneralAPI = new(new HttpClient());
     private static readonly EFactura.EFactura _eFactura = new();
     private static ILogger _logger = NullLoggerFactory.Instance.CreateLogger("ANAFIntegration");
 
