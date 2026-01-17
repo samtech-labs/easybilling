@@ -3,40 +3,50 @@ using EasyBilling.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.DotNet.Scaffolding.Shared;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
 
-namespace EasyBilling.Presentation.Controllers
-{
-    [ApiController]
-    [Route("api/anaf")]
-    public class AnafAuthController(
-        IConfiguration config,
-        ICurrentUserService currentUserService,
-        IAnafIntegrationService anafIntegrationService,
-        IHttpClientFactory httpClientFactory,
-        IDataProtectionProvider dataProtectionProvider) : ControllerBase
-    {
-        private readonly IConfiguration _config = config;
-        private readonly ICurrentUserService _currentUserService = currentUserService;
-        private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
-        private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
-        private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("Anaf.OAuth.State");
+namespace EasyBilling.Presentation.Controllers;
 
-        [HttpGet("authorize")]
-        [Authorize]
-        public IActionResult Authorize()
+[ApiController]
+[Route("api/anaf")]
+public class AnafAuthController(
+    IConfiguration config,
+    ICurrentUserService currentUserService,
+    IAnafIntegrationService anafIntegrationService,
+    IHttpClientFactory httpClientFactory,
+    IDataProtectionProvider dataProtectionProvider,
+    IOAuthCallbackResponseGenerator callbackResponseGenerator,
+    ILogger<AnafAuthController> logger) : ControllerBase
+{
+    private readonly IConfiguration _config = config;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IAnafIntegrationService _anafIntegrationService = anafIntegrationService;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("Anaf.OAuth.State");
+    private readonly IOAuthCallbackResponseGenerator _callbackResponseGenerator = callbackResponseGenerator;
+    private readonly ILogger<AnafAuthController> _logger = logger;
+
+    [HttpGet("authorize")]
+    [Authorize]
+    public IActionResult Authorize()
+    {
+        _logger.LogInformation("ANAF authorization request initiated");
+
+        try
         {
             var userId = _currentUserService.UserId;
 
             if (userId == Guid.Empty)
             {
+                _logger.LogWarning("Authorization request with invalid UserId");
                 return Unauthorized();
             }
+
+            _logger.LogDebug("Generating authorization URL for user {UserId}", userId);
 
             var state = _protector.Protect(userId.ToString());
 
@@ -49,17 +59,33 @@ namespace EasyBilling.Presentation.Controllers
 
             var authUrl = $"{_config["Anaf:AuthUrl"]}?{queryParams}";
 
+            _logger.LogInformation("Authorization URL generated for user {UserId}", userId);
+
             return Ok(new { authUrl });
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating ANAF authorization URL");
+            throw;
+        }
+    }
 
-        [HttpGet("callback")]
-        [AllowAnonymous]
-        public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
+    [HttpGet("callback")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("ANAF callback received");
+
+        try
         {
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
             {
-                return CallbackError("Missing code or state parameter");
+                _logger.LogWarning("Callback received with missing code or state parameter");
+                var errorHtml = _callbackResponseGenerator.GenerateErrorResponse("Missing code or state parameter");
+                return Content(errorHtml, "text/html");
             }
+
+            _logger.LogDebug("Callback parameters received, decrypting state");
 
             Guid userId;
             try
@@ -67,10 +93,13 @@ namespace EasyBilling.Presentation.Controllers
                 var decrypted = _protector.Unprotect(state);
                 userId = Guid.Parse(decrypted);
             }
-            catch (CryptographicException)
+            catch (CryptographicException ex)
             {
+                _logger.LogWarning(ex, "Invalid or tampered state parameter in callback");
                 return BadRequest("Invalid or tampered state");
             }
+
+            _logger.LogDebug("State decrypted successfully for user {UserId}", userId);
 
             var clientId = _config["Anaf:ClientId"];
             var clientSecret = _config["Anaf:ClientSecret"];
@@ -85,19 +114,24 @@ namespace EasyBilling.Presentation.Controllers
                 new AuthenticationHeaderValue("Basic", basicAuthValue);
 
             var tokenRequest = new Dictionary<string, string>
-                {
-                    { "grant_type", "authorization_code" },
-                    { "code", code },
-                    { "redirect_uri", redirectUri ?? string.Empty },
-                    { "token_content_type", "jwt" }
-                };
+            {
+                { "grant_type", "authorization_code" },
+                { "code", code },
+                { "redirect_uri", redirectUri ?? string.Empty },
+                { "token_content_type", "jwt" }
+            };
+
+            _logger.LogDebug("Exchanging authorization code for token from ANAF");
 
             var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(tokenRequest), cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                return CallbackError($"Failed to exchange code for token: {errorContent}");
+                _logger.LogError("Failed to exchange authorization code for token. Status: {StatusCode}, Error: {Error}",
+                    response.StatusCode, errorContent);
+                var errorHtml = _callbackResponseGenerator.GenerateErrorResponse($"Failed to exchange code for token: {errorContent}");
+                return Content(errorHtml, "text/html");
             }
 
             var tokenResponse = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -105,13 +139,19 @@ namespace EasyBilling.Presentation.Controllers
 
             if (tokenData == null || string.IsNullOrEmpty(tokenData.AccessToken))
             {
-                return CallbackError("Invalid token response from ANAF");
+                _logger.LogError("Invalid token response received from ANAF");
+                var errorHtml = _callbackResponseGenerator.GenerateErrorResponse("Invalid token response from ANAF");
+                return Content(errorHtml, "text/html");
             }
+
+            _logger.LogDebug("Token received from ANAF, saving for user {UserId}", userId);
 
             var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken != null)
             {
+                _logger.LogInformation("Updating existing ANAF token for user {UserId}", userId);
+
                 existingToken.AccessToken = tokenData.AccessToken;
                 existingToken.RefreshToken = tokenData.RefreshToken ?? existingToken.RefreshToken;
                 existingToken.AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(tokenData.ExpiresIn);
@@ -122,6 +162,8 @@ namespace EasyBilling.Presentation.Controllers
             }
             else
             {
+                _logger.LogInformation("Creating new ANAF token for user {UserId}", userId);
+
                 var newToken = new AnafTokenCreateDto
                 {
                     UserId = userId,
@@ -136,26 +178,45 @@ namespace EasyBilling.Presentation.Controllers
                 await _anafIntegrationService.SaveAnafTokenAsync(newToken, cancellationToken);
             }
 
-            return CallbackSuccess();
-        }
+            _logger.LogInformation("ANAF token successfully saved/updated for user {UserId}", userId);
 
-        [HttpPost("refresh")]
-        [Authorize]
-        public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken)
+            var successHtml = _callbackResponseGenerator.GenerateSuccessResponse();
+            return Content(successHtml, "text/html");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing ANAF callback");
+            throw;
+        }
+    }
+
+    [HttpPost("refresh")]
+    [Authorize]
+    public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("ANAF token refresh request initiated");
+
+        try
         {
             var userId = _currentUserService.UserId;
 
             if (userId == Guid.Empty)
             {
+                _logger.LogWarning("Token refresh request with invalid UserId");
                 return Unauthorized();
             }
+
+            _logger.LogDebug("Retrieving existing token for user {UserId}", userId);
 
             var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken == null || string.IsNullOrEmpty(existingToken.RefreshToken))
             {
+                _logger.LogWarning("No valid refresh token found for user {UserId}", userId);
                 return BadRequest(new { error = "No refresh token found. Please re-authorize." });
             }
+
+            _logger.LogDebug("Exchanging refresh token for new access token for user {UserId}", userId);
 
             var clientId = _config["Anaf:ClientId"];
             var clientSecret = _config["Anaf:ClientSecret"];
@@ -179,6 +240,8 @@ namespace EasyBilling.Presentation.Controllers
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("Failed to refresh token for user {UserId}. Status: {StatusCode}, Error: {Error}",
+                    userId, response.StatusCode, errorContent);
                 return StatusCode((int)response.StatusCode,
                     new { error = "Failed to refresh token", details = errorContent });
             }
@@ -188,8 +251,11 @@ namespace EasyBilling.Presentation.Controllers
 
             if (tokenData == null || string.IsNullOrEmpty(tokenData.AccessToken))
             {
+                _logger.LogError("Invalid token response received when refreshing token for user {UserId}", userId);
                 return BadRequest(new { error = "Invalid token response" });
             }
+
+            _logger.LogDebug("New token received for user {UserId}, updating stored token", userId);
 
             existingToken.AccessToken = tokenData.AccessToken;
             existingToken.AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(tokenData.ExpiresIn);
@@ -203,25 +269,43 @@ namespace EasyBilling.Presentation.Controllers
 
             await _anafIntegrationService.UpdateAnafTokenAsync(existingToken, cancellationToken);
 
+            _logger.LogInformation("ANAF token successfully refreshed for user {UserId}", userId);
+
             return Ok(new
             {
                 message = "Token refreshed successfully",
                 expiresAt = existingToken.AccessTokenExpiresAt
             });
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing ANAF token");
+            throw;
+        }
+    }
 
-        [HttpGet("status")]
-        [Authorize]
-        public async Task<IActionResult> TokenStatus(CancellationToken cancellationToken)
+    [HttpGet("status")]
+    [Authorize]
+    public async Task<IActionResult> TokenStatus(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("ANAF token status check requested");
+
+        try
         {
             var userId = _currentUserService.UserId;
+
+            _logger.LogDebug("Retrieving token status for user {UserId}", userId);
 
             var existingToken = await _anafIntegrationService.GetAnafTokenByUserIdAsync(userId, cancellationToken);
 
             if (existingToken == null || string.IsNullOrEmpty(existingToken.RefreshToken))
             {
+                _logger.LogInformation("User {UserId} is not authorized with ANAF", userId);
                 return Ok(new { isAuthorized = false });
             }
+
+            _logger.LogInformation("User {UserId} is authorized with ANAF, access token expires at {ExpiresAt}",
+                userId, existingToken.AccessTokenExpiresAt);
 
             return Ok(new
             {
@@ -230,81 +314,10 @@ namespace EasyBilling.Presentation.Controllers
                 refreshTokenExpiresAt = existingToken.RefreshTokenExpiresAt
             });
         }
-
-        private ContentResult CallbackSuccess()
+        catch (Exception ex)
         {
-            var html = @"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>ANAF Authorization</title>
-                    <style>
-                        body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0fdf4; }
-                        .container { text-align: center; padding: 2rem; }
-                        .icon { font-size: 4rem; margin-bottom: 1rem; }
-                        h1 { color: #166534; margin-bottom: 0.5rem; }
-                        p { color: #6b7280; }
-                    </style>
-                </head>
-                <body>
-                    <div class='container'>
-                        <div class='icon'>✓</div>
-                        <h1>Authorization Successful</h1>
-                        <p>This window will close automatically...</p>
-                    </div>
-                    <script>
-                        if (window.opener) {
-                            window.opener.postMessage({ type: 'ANAF_AUTH_SUCCESS' }, '*');
-                            setTimeout(function() { window.close(); }, 1500);
-                        }
-                    </script>
-                </body>
-                </html>";
-
-            return Content(html, "text/html");
-        }
-
-        private ContentResult CallbackError(string errorMessage)
-        {
-            var sanitizedError = errorMessage
-                .Replace("'", "\\'")
-                .Replace("\"", "\\\"")
-                .Replace("\n", " ")
-                .Replace("\r", " ");
-
-            var html = $@"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>ANAF Authorization Error</title>
-                    <style>
-                        body {{ font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #fef2f2; }}
-                        .container {{ text-align: center; padding: 2rem; max-width: 500px; }}
-                        .icon {{ font-size: 4rem; margin-bottom: 1rem; }}
-                        h1 {{ color: #dc2626; margin-bottom: 0.5rem; }}
-                        p {{ color: #6b7280; }}
-                        .error {{ background: #fee2e2; padding: 1rem; border-radius: 8px; margin-top: 1rem; color: #991b1b; font-size: 0.875rem; word-break: break-word; }}
-                        button {{ margin-top: 1rem; padding: 0.5rem 1rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; }}
-                        button:hover {{ background: #4b5563; }}
-                    </style>
-                </head>
-                <body>
-                    <div class='container'>
-                        <div class='icon'>✕</div>
-                        <h1>Authorization Failed</h1>
-                        <p>There was a problem connecting to ANAF.</p>
-                        <div class='error'>{sanitizedError}</div>
-                        <button onclick='window.close()'>Close Window</button>
-                    </div>
-                    <script>
-                        if (window.opener) {{
-                            window.opener.postMessage({{ type: 'ANAF_AUTH_ERROR', error: '{sanitizedError}' }}, '*');
-                        }}
-                    </script>
-                </body>
-                </html>";
-
-            return Content(html, "text/html");
+            _logger.LogError(ex, "Error checking ANAF token status");
+            throw;
         }
     }
 }

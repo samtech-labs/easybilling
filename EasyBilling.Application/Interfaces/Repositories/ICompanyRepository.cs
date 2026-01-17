@@ -1,16 +1,21 @@
 ﻿using EasyBilling.Application.Dtos;
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.Application.Interfaces.Repositories
+namespace EasyBilling.Application.Interfaces.Repositories;
+
+public interface ICompanyRepository
 {
-    public interface ICompanyRepository
-    {
-        Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-        Task<Company?> GetByCuiAsync(string cui, Guid userId, CancellationToken cancellationToken = default);
-        Task<List<Company>> GetAllCompaniesAsync(CancellationToken cancellationToken = default);
-        Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId, CancellationToken cancellationToken = default);
-        Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter, CancellationToken cancellationToken = default);
-        Task AddAsync(Company company, CancellationToken cancellationToken = default);
-        Task DeleteAsync(Company company, CancellationToken cancellationToken = default);
-    }
+    Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<Company?> GetByCuiAsync(string cui, Guid userId, CancellationToken cancellationToken = default);
+
+    Task<List<Company>> GetAllCompaniesAsync(CancellationToken cancellationToken = default);
+
+    Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter, CancellationToken cancellationToken = default);
+
+    Task AddAsync(Company company, CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(Company company, CancellationToken cancellationToken = default);
 }

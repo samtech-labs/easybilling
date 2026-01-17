@@ -1,10 +1,10 @@
 using EasyBilling.Domain.Models;
 
-namespace EasyBilling.ANAFIntegration.EFactura.Interfaces
+namespace EasyBilling.ANAFIntegration.EFactura.Interfaces;
+
+public interface IEFacturaXmlGenerator
 {
-    public interface IEFacturaXmlGenerator
-    {
-        string GenerateXml(Invoice invoice);
-        void GenerateXmlFile(Invoice invoice, string filePath);
-    }
+    string GenerateXml(Invoice invoice);
+
+    void GenerateXmlFile(Invoice invoice, string filePath);
 }

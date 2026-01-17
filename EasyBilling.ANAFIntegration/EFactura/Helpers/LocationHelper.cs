@@ -1,53 +1,79 @@
 ﻿using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
-namespace EasyBilling.ANAFIntegration.EFactura.Helpers
+namespace EasyBilling.ANAFIntegration.EFactura.Helpers;
+
+public static class LocationHelper
 {
-    public static class LocationHelper
-    {
-        /// <summary>
-        /// Returns all counties from Romania
-        /// </summary>
-        public static List<CountyDto> GetCounties()
-        {
-            return Counties.OrderBy(c => c.Name).ToList();
-        }
+    private static ILogger _logger = NullLoggerFactory.Instance.CreateLogger("LocationHelper");
 
-        /// <summary>
-        /// Returns all cities from Romania, optionally filtered by county code
-        /// </summary>
-        public static List<CityDto> GetCities(string? countyCode = null)
+    public static void SetLogger(ILogger logger)
+    {
+        _logger = logger ?? NullLoggerFactory.Instance.CreateLogger("LocationHelper");
+        _logger.LogDebug("LocationHelper logger initialized");
+    }
+
+    public static List<CountyDto> GetCounties()
+    {
+        _logger.LogDebug("Retrieving all counties from Romania - Total count: {CountyCount}", Counties.Count);
+        var result = Counties.OrderBy(c => c.Name).ToList();
+        _logger.LogDebug("Counties retrieved and sorted - Returning {CountyCount} counties", result.Count);
+        return result;
+    }
+
+    public static List<CityDto> GetCities(string? countyCode = null)
+    {
+        _logger.LogDebug("Retrieving cities from Romania{Filter}",
+            string.IsNullOrEmpty(countyCode) ? "" : $" for county code: {countyCode}");
+
+        try
         {
             var cities = Cities.AsEnumerable();
 
             if (!string.IsNullOrEmpty(countyCode))
             {
+                _logger.LogDebug("Applying county code filter: {CountyCode}", countyCode);
                 cities = cities.Where(c => c.CountyCode.Equals(countyCode, StringComparison.OrdinalIgnoreCase));
             }
 
-            return cities.OrderBy(c => c.CountyCode).ThenBy(c => c.Name).ToList();
+            var result = cities.OrderBy(c => c.CountyCode).ThenBy(c => c.Name).ToList();
+            _logger.LogDebug("Cities retrieved and sorted - Returning {CityCount} cities{Filter}",
+                result.Count, string.IsNullOrEmpty(countyCode) ? "" : $" for county {countyCode}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving cities for county code: {CountyCode}", countyCode);
+            throw;
+        }
+    }
+
+    public static string NormalizeCity(string? city)
+    {
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            _logger.LogDebug("NormalizeCity called with empty city name");
+            return String.Empty;
         }
 
-        /// <summary>
-        /// Normalize the city name by removing common prefixes
-        /// "Mun. Târgu Jiu" => "Târgu Jiu"
-        /// "Sector 1 Mun. București" => "SECTOR1"
-        /// </summary>
-        public static string NormalizeCity(string? city)
-        {
-            if (string.IsNullOrWhiteSpace(city))
-                return "";
+        _logger.LogDebug("Normalizing city name: {OriginalCity}", city);
 
+        try
+        {
             var clean = city.Trim();
 
-            // If it contains "Sector" - return in ANAF format: SECTOR1, SECTOR2, etc.
             if (clean.Contains("Sector", StringComparison.OrdinalIgnoreCase))
             {
                 var match = Regex.Match(clean, @"Sector\s*(\d)", RegexOptions.IgnoreCase);
                 if (match.Success)
-                    return $"SECTOR{match.Groups[1].Value}";  // SECTOR1, SECTOR2, etc.
+                {
+                    var normalized = $"SECTOR{match.Groups[1].Value}";
+                    _logger.LogDebug("City normalized (Sector format): {OriginalCity} => {NormalizedCity}", city, normalized);
+                    return normalized;
+                }
             }
 
-            // Remove common prefixes
             var prefixes = new[] { "Mun.", "Municipiul", "Oraș", "Oras", "Com.", "Comuna", "Sat" };
 
             foreach (var prefix in prefixes)
@@ -55,78 +81,123 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
                 if (clean.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 {
                     clean = clean[prefix.Length..].Trim();
+                    _logger.LogDebug("Removed prefix {Prefix}: {City}", prefix, clean);
                 }
             }
 
-            // Removes any occurrence of the prefixes within the string
             foreach (var prefix in prefixes)
             {
                 var pattern = $@"\s*{Regex.Escape(prefix)}\.?\s*\S*";
+                var beforeClean = clean;
                 clean = Regex.Replace(clean, pattern, "", RegexOptions.IgnoreCase).Trim();
+                if (beforeClean != clean)
+                {
+                    _logger.LogDebug("Removed pattern {Pattern}: {Before} => {After}", prefix, beforeClean, clean);
+                }
             }
 
+            _logger.LogDebug("City normalized: {OriginalCity} => {NormalizedCity}", city, clean);
             return clean;
         }
-
-        /// <summary>
-        /// Converts the county name to its ISO code
-        /// "MUNICIPIUL BUCUREȘTI" => "RO-B"
-        /// "Gorj" => "RO-GJ"
-        /// </summary>
-        public static string GetCountyCode(string? countyName)
+        catch (Exception ex)
         {
-            if (string.IsNullOrWhiteSpace(countyName))
-                return "RO-B";
+            _logger.LogError(ex, "Error normalizing city name: {City}", city);
+            throw;
+        }
+    }
 
+    public static string GetCountyCode(string? countyName)
+    {
+        if (string.IsNullOrWhiteSpace(countyName))
+        {
+            _logger.LogDebug("GetCountyCode called with empty county name, returning default: RO-B");
+            return "RO-B";
+        }
+
+        _logger.LogDebug("Converting county name to ISO code: {CountyName}", countyName);
+
+        try
+        {
             var clean = countyName.Trim().ToUpper();
 
-            // Already in ISO code format
             if (clean.StartsWith("RO-"))
+            {
+                _logger.LogDebug("County name already in ISO format: {CountyCode}", clean);
                 return clean;
+            }
 
             clean = clean
                 .Replace("MUNICIPIUL", "")
-                .Replace("JUDEȚUL", "")
+                .Replace("JUDEȚULUI", "")
                 .Replace("JUDETUL", "")
                 .Trim();
 
             if (CountyNameToCode.TryGetValue(clean, out var code))
+            {
+                _logger.LogDebug("County code found: {CountyName} => {CountyCode}", countyName, code);
                 return code;
+            }
 
             var normalized = RemoveDiacritics(clean);
             if (CountyNameToCode.TryGetValue(normalized, out code))
+            {
+                _logger.LogDebug("County code found (after removing diacritics): {CountyName} => {CountyCode}", countyName, code);
                 return code;
+            }
 
+            _logger.LogWarning("County code not found for: {CountyName}, returning default: RO-B", countyName);
             return "RO-B";
         }
-
-        /// <summary>
-        /// Converts the county ISO code to its name
-        /// "RO-GJ" => "Gorj"
-        /// </summary>
-        public static string? GetCountyName(string? countyCode)
+        catch (Exception ex)
         {
-            if (string.IsNullOrWhiteSpace(countyCode))
-                return null;
+            _logger.LogError(ex, "Error converting county name to ISO code: {CountyName}", countyName);
+            throw;
+        }
+    }
 
+    public static string? GetCountyName(string? countyCode)
+    {
+        if (string.IsNullOrWhiteSpace(countyCode))
+        {
+            _logger.LogDebug("GetCountyName called with empty county code");
+            return null;
+        }
+
+        _logger.LogDebug("Converting county ISO code to name: {CountyCode}", countyCode);
+
+        try
+        {
             var county = Counties.FirstOrDefault(c =>
                 c.Code.Equals(countyCode, StringComparison.OrdinalIgnoreCase));
 
-            return county?.Name;
-        }
+            if (county == null)
+            {
+                _logger.LogWarning("County code not found: {CountyCode}", countyCode);
+                return null;
+            }
 
-        private static string RemoveDiacritics(string text)
+            _logger.LogDebug("County name found: {CountyCode} => {CountyName}", countyCode, county.Name);
+            return county.Name;
+        }
+        catch (Exception ex)
         {
-            return text
-                .Replace("Ă", "A").Replace("Â", "A").Replace("Î", "I")
-                .Replace("Ș", "S").Replace("Ț", "T")
-                .Replace("ă", "a").Replace("â", "a").Replace("î", "i")
-                .Replace("ș", "s").Replace("ț", "t");
+            _logger.LogError(ex, "Error converting county ISO code to name: {CountyCode}", countyCode);
+            throw;
         }
+    }
 
-        #region Static Data
+    private static string RemoveDiacritics(string text)
+    {
+        return text
+            .Replace("Ă", "A").Replace("Â", "A").Replace("Î", "I")
+            .Replace("Ș", "S").Replace("Ț", "T")
+            .Replace("ă", "a").Replace("â", "a").Replace("î", "i")
+            .Replace("ș", "s").Replace("ț", "t");
+    }
 
-        private static readonly Dictionary<string, string> CountyNameToCode = new(StringComparer.OrdinalIgnoreCase)
+    #region Static Data
+
+    private static readonly Dictionary<string, string> CountyNameToCode = new(StringComparer.OrdinalIgnoreCase)
     {
         { "ALBA", "RO-AB" },
         { "ARAD", "RO-AR" },
@@ -198,7 +269,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         { "VRANCEA", "RO-VN" }
     };
 
-        private static readonly List<CountyDto> Counties = new()
+    private static readonly List<CountyDto> Counties = new()
     {
         new("RO-AB", "Alba"),
         new("RO-AR", "Arad"),
@@ -244,7 +315,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         new("RO-VN", "Vrancea")
     };
 
-        private static readonly List<CityDto> Cities = new()
+    private static readonly List<CityDto> Cities = new()
     {
         // Alba
         new("Alba Iulia", "RO-AB"),
@@ -651,10 +722,8 @@ namespace EasyBilling.ANAFIntegration.EFactura.Helpers
         new("Odobești", "RO-VN")
     };
 
-        #endregion
-    }
-
-    public record CountyDto(string Code, string Name);
-    public record CityDto(string Name, string CountyCode);
-
+    #endregion
 }
+
+public record CountyDto(string Code, string Name);
+public record CityDto(string Name, string CountyCode);

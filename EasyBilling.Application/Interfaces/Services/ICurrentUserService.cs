@@ -1,9 +1,10 @@
-namespace EasyBilling.Application.Interfaces.Services
+namespace EasyBilling.Application.Interfaces.Services;
+
+public interface ICurrentUserService
 {
-    public interface ICurrentUserService
-    {
-        Guid UserId { get; }
-        string? Username { get; }
-        bool IsAuthenticated { get; }
-    }
+    Guid UserId { get; }
+
+    string? Username { get; }
+
+    bool IsAuthenticated { get; }
 }
