@@ -11,6 +11,7 @@ using EasyBilling.Infrastructure.Middleware;
 using EasyBilling.Infrastructure.Persistence;
 using EasyBilling.Infrastructure.Repositories;
 using EasyBilling.Infrastructure.Services;
+using EasyBilling.Presentation.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -109,6 +110,7 @@ builder.Services.AddScoped<AnafStatusCheckJob>();
 builder.Services.AddScoped<IInvoiceAnafSubmissionService, InvoiceAnafSubmissionService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserContext>();
+builder.Services.AddScoped<IOAuthCallbackResponseGenerator, OAuthCallbackResponseGenerator>();
 
 builder.Services.AddOpenApi();
 
