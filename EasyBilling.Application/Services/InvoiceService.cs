@@ -277,6 +277,31 @@ namespace EasyBilling.Application.Services
             return invoices.Select(MapInvoiceToDto).ToList();
         }
 
+        public async Task<PaginatedResult<InvoiceResponseDto>> GetInvoicesByCompanyIdPaginatedAsync(
+            Guid companyId,
+            InvoicePaginationFilter filter,
+            CancellationToken cancellationToken = default)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var paginatedInvoices = await _invoiceRepository.GetInvoicesByCompanyIdPaginatedAsync(
+                companyId,
+                filter,
+                cancellationToken);
+
+            return new PaginatedResult<InvoiceResponseDto>
+            {
+                Items = paginatedInvoices.Items.Select(MapInvoiceToDto).ToList(),
+                PageNumber = paginatedInvoices.PageNumber,
+                PageSize = paginatedInvoices.PageSize,
+                TotalCount = paginatedInvoices.TotalCount
+            };
+        }
+
         public async Task<List<InvoiceResponseDto>> GetCreditNotesByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default)
         {
             var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
@@ -288,6 +313,31 @@ namespace EasyBilling.Application.Services
             var creditNotes = await _invoiceRepository.GetAllCreditNotesByCompanyIdAsync(companyId, cancellationToken);
 
             return creditNotes.Select(MapInvoiceToDto).ToList();
+        }
+
+        public async Task<PaginatedResult<InvoiceResponseDto>> GetCreditNotesByCompanyIdPaginatedAsync(
+            Guid companyId,
+            InvoicePaginationFilter filter,
+            CancellationToken cancellationToken = default)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId, cancellationToken);
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            var paginatedCreditNotes = await _invoiceRepository.GetCreditNotesByCompanyIdPaginatedAsync(
+                companyId,
+                filter,
+                cancellationToken);
+
+            return new PaginatedResult<InvoiceResponseDto>
+            {
+                Items = paginatedCreditNotes.Items.Select(MapInvoiceToDto).ToList(),
+                PageNumber = paginatedCreditNotes.PageNumber,
+                PageSize = paginatedCreditNotes.PageSize,
+                TotalCount = paginatedCreditNotes.TotalCount
+            };
         }
 
         public async Task<LastInvoiceNumberDto> GetLastInvoiceNumberAsync(Guid companyId, CancellationToken cancellationToken = default)

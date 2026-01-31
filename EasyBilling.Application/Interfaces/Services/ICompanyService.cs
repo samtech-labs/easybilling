@@ -7,6 +7,7 @@ namespace EasyBilling.Application.Interfaces.Services
     public interface ICompanyService
     {
         Task<List<Company>> GetCompaniesByUserAsync(Guid userId);
+        Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter);
         Task<Company> CreateCompanyAsync(CreateCompanyRequest createCompanyRequest);
         Task<CompanyResponseDto> GetCompanyDetailsFromAnaf(string cui);
         Task<Company?> GetCompanyByIdAsync(Guid companyId, CancellationToken cancellationToken = default);

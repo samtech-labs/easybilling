@@ -1,4 +1,5 @@
-﻿using EasyBilling.Domain.Models;
+﻿using EasyBilling.Application.Dtos;
+using EasyBilling.Domain.Models;
 
 namespace EasyBilling.Application.Interfaces.Repositories
 {
@@ -8,6 +9,7 @@ namespace EasyBilling.Application.Interfaces.Repositories
         Task<Company?> GetByCuiAsync(string cui, Guid userId, CancellationToken cancellationToken = default);
         Task<List<Company>> GetAllCompaniesAsync(CancellationToken cancellationToken = default);
         Task<List<Company>> GetAllCompaniesByUserAsync(Guid userId, CancellationToken cancellationToken = default);
+        Task<PaginatedResult<Company>> GetCompaniesByUserPaginatedAsync(Guid userId, CompanyPaginationFilter filter, CancellationToken cancellationToken = default);
         Task AddAsync(Company company, CancellationToken cancellationToken = default);
         Task DeleteAsync(Company company, CancellationToken cancellationToken = default);
     }
