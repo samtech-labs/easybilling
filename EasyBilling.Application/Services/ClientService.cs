@@ -47,6 +47,9 @@ namespace EasyBilling.Application.Services
             }
 
             var cleanCui = createClientRequest.CUI.Replace("RO", "").Replace(" ", "").Trim();
+            var isRomanianClient = string.IsNullOrEmpty(createClientRequest.Country) ||
+                                   createClientRequest.Country.Equals("RO", StringComparison.OrdinalIgnoreCase) ||
+                                   createClientRequest.Country.Equals("Romania", StringComparison.OrdinalIgnoreCase);
 
             // Check if client CUI matches the company's own CUI
             if (cleanCui == company.CUI.Replace("RO", "").Replace(" ", "").Trim())
@@ -61,22 +64,60 @@ namespace EasyBilling.Application.Services
                 throw new InvalidOperationException($"A client with CUI '{cleanCui}' already exists.");
             }
 
-            var anafDetails = await ANAFIntegration.ANAFIntegration.GetCompanyDetails(cleanCui, DateTime.Today);
-
-            var client = new Client
+            // Validate required fields for international clients
+            if (!isRomanianClient)
             {
-                Id = Guid.NewGuid(),
-                CompanyId = company.Id,
-                Name = anafDetails?.Name ?? createClientRequest.Name,
-                CUI = cleanCui,
-                Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createClientRequest.Address,
-                County = anafDetails?.RegisteredAddress?.County ?? createClientRequest.County,
-                City = anafDetails?.RegisteredAddress?.City ?? createClientRequest.City,
-                Country = anafDetails?.RegisteredAddress?.Country ?? createClientRequest.Country,
-                RegNumber = anafDetails?.RegistrationNumber ?? createClientRequest.RegNumber,
-                IBAN = createClientRequest.IBAN,
-                Bank = createClientRequest.Bank
-            };
+                if (string.IsNullOrWhiteSpace(createClientRequest.Address))
+                {
+                    throw new InvalidOperationException("Address is required for international clients.");
+                }
+                if (string.IsNullOrWhiteSpace(createClientRequest.Country))
+                {
+                    throw new InvalidOperationException("Country is required for international clients.");
+                }
+            }
+
+            Client client;
+
+            // Only fetch ANAF details for Romanian clients
+            if (isRomanianClient)
+            {
+                var anafDetails = await ANAFIntegration.ANAFIntegration.GetCompanyDetails(cleanCui, DateTime.Today);
+
+                client = new Client
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Name = anafDetails?.Name ?? createClientRequest.Name,
+                    CUI = cleanCui,
+                    Address = anafDetails?.RegisteredAddress?.FormattedAddress ?? createClientRequest.Address,
+                    County = anafDetails?.RegisteredAddress?.County ?? createClientRequest.County,
+                    City = anafDetails?.RegisteredAddress?.City ?? createClientRequest.City,
+                    Country = anafDetails?.RegisteredAddress?.Country ?? createClientRequest.Country ?? "Romania",
+                    RegNumber = anafDetails?.RegistrationNumber ?? createClientRequest.RegNumber,
+                    IBAN = createClientRequest.IBAN,
+                    Bank = createClientRequest.Bank
+                };
+            }
+            else
+            {
+                // For international clients, use provided data without ANAF lookup
+                client = new Client
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Name = createClientRequest.Name,
+                    CUI = cleanCui,
+                    Address = createClientRequest.Address,
+                    County = createClientRequest.County,
+                    City = createClientRequest.City,
+                    Country = createClientRequest.Country,
+                    RegNumber = createClientRequest.RegNumber,
+                    IBAN = createClientRequest.IBAN,
+                    Bank = createClientRequest.Bank
+                };
+            }
+
             await _clientRepository.AddAsync(client);
             return client;
         }
