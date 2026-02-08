@@ -71,9 +71,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8C98C36AE28E42B8A7ED3475233393A6 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B413C9A42C334CB49831424D0BD9CEFC }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FBC7349EA20B49CC9DBC1DC5DE388ABC }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2A2B7215A819414195A2413E2A66C3AE }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A1421EF8A65B4CADBE354904EB47D1EB }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3CC1E99C9F7242DF9A6796B79FF6C5F2 }}
 
       - name: Get runner public IP
         id: ip
