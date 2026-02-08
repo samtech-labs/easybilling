@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260109135042_AddMembershipTypeTable")]
+    partial class AddMembershipTypeTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -176,20 +179,12 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("OriginalInvoiceId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Series")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("numeric");
-
-                    b.Property<int>("Type")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(380);
 
                     b.Property<decimal>("Vat")
                         .HasColumnType("numeric");
@@ -199,10 +194,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.HasIndex("ClientId");
 
                     b.HasIndex("CompanyId");
-
-                    b.HasIndex("OriginalInvoiceId");
-
-                    b.HasIndex("Type");
 
                     b.ToTable("Invoices");
                 });
@@ -293,73 +284,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.ToTable("InvoiceLine");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.Membership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("MembershipTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EndDate");
-
-                    b.HasIndex("MembershipTypeId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("Memberships", (string)null);
-                });
-
-            modelBuilder.Entity("EasyBilling.Domain.Models.MembershipType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DurationInDays")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("EFacturaActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("MaxInvoicesPerMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("MembershipTypes", (string)null);
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -434,16 +358,9 @@ namespace EasyBilling.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyBilling.Domain.Models.Invoice", "OriginalInvoice")
-                        .WithMany("CreditNotes")
-                        .HasForeignKey("OriginalInvoiceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Client");
 
                     b.Navigation("Company");
-
-                    b.Navigation("OriginalInvoice");
                 });
 
             modelBuilder.Entity("EasyBilling.Domain.Models.InvoiceAnafSubmission", b =>
@@ -468,25 +385,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
-            modelBuilder.Entity("EasyBilling.Domain.Models.Membership", b =>
-                {
-                    b.HasOne("EasyBilling.Domain.Models.MembershipType", "MembershipType")
-                        .WithMany()
-                        .HasForeignKey("MembershipTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EasyBilling.Domain.Models.User", "User")
-                        .WithOne("Membership")
-                        .HasForeignKey("EasyBilling.Domain.Models.Membership", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MembershipType");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EasyBilling.Domain.Models.Company", b =>
                 {
                     b.Navigation("Clients");
@@ -496,8 +394,6 @@ namespace EasyBilling.Infrastructure.Migrations
                 {
                     b.Navigation("AnafSubmissions");
 
-                    b.Navigation("CreditNotes");
-
                     b.Navigation("InvoiceLines");
                 });
 
@@ -506,8 +402,6 @@ namespace EasyBilling.Infrastructure.Migrations
                     b.Navigation("AnafToken");
 
                     b.Navigation("Companies");
-
-                    b.Navigation("Membership");
                 });
 #pragma warning restore 612, 618
         }

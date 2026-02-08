@@ -196,6 +196,17 @@ namespace EasyBilling.Infrastructure.Repositories
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task<List<Invoice>> GetAllForUserByPeriodAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            return await _db.Invoices
+                .Include(i => i.Company)
+                .Include(i => i.Client)
+                .Include(i => i.InvoiceLines)
+                .Where(i => i.Company.UserId == userId && i.Date >= startDate && i.Date <= endDate)
+                .OrderByDescending(i => i.Date)
+                .ToListAsync(cancellationToken);
+        }
+
         private static IQueryable<Invoice> ApplySorting(
             IQueryable<Invoice> query, 
             string sortBy, 
