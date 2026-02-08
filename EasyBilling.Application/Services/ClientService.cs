@@ -1,4 +1,5 @@
-﻿using EasyBilling.Application.Interfaces.Repositories;
+﻿using EasyBilling.Application.Dtos;
+using EasyBilling.Application.Interfaces.Repositories;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using EasyBilling.Domain.Models;
@@ -20,6 +21,20 @@ namespace EasyBilling.Application.Services
             }
 
             return await _clientRepository.GetAllClientsByCompanyIdAsync(companyId);
+        }
+
+        public async Task<PaginatedResult<Client>> GetClientsByCompanyIdPaginatedAsync(
+            Guid companyId,
+            ClientPaginationFilter filter)
+        {
+            var company = await _companyService.GetCompanyByIdAsync(companyId);
+
+            if (company == null)
+            {
+                throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            return await _clientRepository.GetClientsByCompanyIdPaginatedAsync(companyId, filter);
         }
 
         public async Task<Client> CreateClientAsync(CreateClientRequest createClientRequest, Guid companyId)

@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using EasyBilling.Application.Dtos;
 using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +17,15 @@ namespace EasyBilling.Presentation.Controllers
 
         [HttpGet]
         [Route("GetAllCompanies")]
-        public async Task<IActionResult> GetCompanies()
+        public async Task<IActionResult> GetCompanies(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] string? sortBy = null,
+            [FromQuery] string sortOrder = "desc",
+            [FromQuery] bool? isVatPayer = null,
+            [FromQuery] bool? isEFacturaActive = null,
+            [FromQuery] string? county = null)
         {
             // TODO: Move user identification to a middleware or service
             // to avoid repeating this logic in every controller method.
@@ -29,8 +38,56 @@ namespace EasyBilling.Presentation.Controllers
                 return Unauthorized();
             }
 
-            var companies = await _companyService.GetCompaniesByUserAsync(userId);
-            return Ok(companies);
+            var hasPaginationParams = !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(sortBy) || sortOrder != "desc" ||
+                isVatPayer.HasValue || isEFacturaActive.HasValue || !string.IsNullOrEmpty(county);
+
+            if (hasPaginationParams)
+            {
+                try
+                {
+                    var filter = new CompanyPaginationFilter
+                    {
+                        PageNumber = pageNumber,
+                        PageSize = pageSize,
+                        SearchTerm = searchTerm,
+                        SortBy = sortBy,
+                        SortOrder = sortOrder,
+                        IsVatPayer = isVatPayer,
+                        IsEFacturaActive = isEFacturaActive,
+                        County = county
+                    };
+
+                    if (!filter.IsValid)
+                    {
+                        return BadRequest(new { message = "Invalid pagination parameters. PageNumber must be >= 1 and PageSize must be between 1 and 100." });
+                    }
+
+                    var result = await _companyService.GetCompaniesByUserPaginatedAsync(userId, filter);
+                    return Ok(result);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { message = ex.Message });
+                }
+                catch (Exception)
+                {
+                    return StatusCode(500, "An error occurred while retrieving companies.");
+                }
+            }
+
+            try
+            {
+                var companies = await _companyService.GetCompaniesByUserAsync(userId);
+                return Ok(companies);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving companies.");
+            }
         }
 
         [HttpGet]
