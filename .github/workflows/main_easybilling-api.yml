@@ -1,3 +1,6 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
 name: Build and deploy ASP.Net Core app to Azure Web App - easybilling-api
 
 on:
@@ -10,7 +13,7 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: read #This is required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
@@ -23,57 +26,34 @@ jobs:
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
-      - name: Restore dotnet tools
-        run: dotnet tool restore
-
-      - name: Create EF migrations bundle
-        run: >
-          dotnet ef migrations bundle
-          --project EasyBilling.Infrastructure/EasyBilling.Infrastructure.csproj
-          --startup-project EasyBilling.Presentation/EasyBilling.Presentation.csproj
-          --output "${{env.DOTNET_ROOT}}/migrate/migrate.exe"
-
       - name: dotnet publish
-        run: dotnet publish EasyBilling.Presentation/EasyBilling.Presentation.csproj -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
 
-      - name: Upload app artifact
+      - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
           path: ${{env.DOTNET_ROOT}}/myapp
 
-      - name: Upload migrations bundle artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ef-migrate
-          path: ${{env.DOTNET_ROOT}}/migrate/migrate.exe
-
   deploy:
     runs-on: windows-latest
     needs: build
     permissions:
-      id-token: write
-      contents: read
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
 
     steps:
-      - name: Download app artifact
+      - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
           name: .net-app
-          path: app
-
-      - name: Download migrations bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ef-migrate
-          path: migrate
-
+      
       - name: Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2A2B7215A819414195A2413E2A66C3AE }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A1421EF8A65B4CADBE354904EB47D1EB }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3CC1E99C9F7242DF9A6796B79FF6C5F2 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3CC1E99C9F7242DF9A6796B79FF6C5F2 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A1421EF8A65B4CADBE354904EB47D1EB }}
 
       - name: Get runner public IP
         id: ip
@@ -127,9 +107,10 @@ jobs:
             -y
 
       - name: Deploy to Azure Web App
+        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'easybilling-api'
           slot-name: 'Production'
-          package: app
+          package: .
           
