@@ -189,6 +189,7 @@ namespace EasyBilling.Application.Services
                 Number = request.Number,
                 TotalAmount = totalAmount,
                 Vat = totalVat,
+                Currency = request.Currency,
                 CompanyId = companyId,
                 ClientId = clientId,
                 InvoiceLines = request.InvoiceLines.Select(line =>
@@ -220,6 +221,7 @@ namespace EasyBilling.Application.Services
                 TotalAmount = totalAmount,
                 TotalVat = totalVat,
                 GrandTotal = totalAmount + totalVat,
+                Currency = invoice.Currency,
                 Company = new CompanyResponseDto
                 {
                     Id = company.Id,
@@ -613,7 +615,7 @@ namespace EasyBilling.Application.Services
                                 r.AutoItem().Text("Total factură: ")
                                     .FontSize(13)
                                     .FontColor(mutedText);
-                                r.AutoItem().Text($"{grandTotal:0.00} Lei")
+                                r.AutoItem().Text($"{grandTotal:0.00} {GetCurrencyLabel(invoice.Currency)}")
                                     .FontSize(14)
                                     .Bold()
                                     .FontColor(primaryColor);
@@ -735,6 +737,7 @@ namespace EasyBilling.Application.Services
                 TotalVat = totalVat,
                 GrandTotal = totalAmount + totalVat,
                 Type = invoice.Type,
+                Currency = invoice.Currency,
                 OriginalInvoiceId = invoice.OriginalInvoiceId,
                 OriginalInvoiceNumber = invoice.OriginalInvoice != null
                     ? $"{invoice.OriginalInvoice.Series} nr. {invoice.OriginalInvoice.Number}"
@@ -762,6 +765,12 @@ namespace EasyBilling.Application.Services
                 }).ToList() ?? new List<InvoiceLineResponseDto>()
             };
         }
+
+        private static string GetCurrencyLabel(Currency currency) => currency switch
+        {
+            Currency.EUR => "EUR",
+            _ => "Lei"
+        };
 
         public async Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default)
         {
@@ -899,6 +908,7 @@ namespace EasyBilling.Application.Services
                 Id = Guid.NewGuid(),
                 Date = DateTime.UtcNow,
                 Type = InvoiceType.CreditNote,
+                Currency = originalInvoice.Currency,
                 Series = series,
                 Number = number,
                 TotalAmount = totalAmount,

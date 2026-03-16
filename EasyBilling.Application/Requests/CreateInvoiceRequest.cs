@@ -1,7 +1,10 @@
+using EasyBilling.Domain.Enums;
+
 namespace EasyBilling.Application.Requests
 {
     public class CreateInvoiceRequest
     {
+        public Currency Currency { get; set; } = Currency.RON;
         public required Guid CompanyId { get; set; }
         public required string Series { get; set; }
         public int Number { get; set; }
