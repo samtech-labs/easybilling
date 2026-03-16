@@ -51,6 +51,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         {
             var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
             var dueDate = invoice.DueDate ?? invoice.Date;
+            var currencyCode = GetCurrencyCode(invoice.Currency);
 
             var elements = new List<object?>
             {
@@ -63,19 +64,22 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                 new XElement(NS_CBC + "IssueDate", invoice.Date.ToString("yyyy-MM-dd")),
                 new XElement(NS_CBC + "DueDate", dueDate.ToString("yyyy-MM-dd")),
                 new XElement(NS_CBC + "InvoiceTypeCode", "380"),
-                new XElement(NS_CBC + "DocumentCurrencyCode", "RON")
+                new XElement(NS_CBC + "DocumentCurrencyCode", currencyCode)
             };
+
+            if (invoice.Currency != Currency.RON)
+                elements.Add(new XElement(NS_CBC + "TaxCurrencyCode", "RON"));
 
             elements.Add(CreateSupplierParty(invoice.Company!));
             elements.Add(CreateCustomerParty(invoice.Client!));
-            elements.Add(CreateTaxTotal(taxTotal, taxGroups));
-            elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal));
-            elements.AddRange(CreateInvoiceLines(invoice.InvoiceLines));
+            elements.Add(CreateTaxTotal(taxTotal, taxGroups, currencyCode));
+            elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal, currencyCode));
+            elements.AddRange(CreateInvoiceLines(invoice.InvoiceLines, currencyCode));
 
             return new XElement(NS_INVOICE + "Invoice", elements.Where(e => e != null));
         }
 
-        private IEnumerable<XElement> CreateInvoiceLines(ICollection<InvoiceLine>? lines)
+        private IEnumerable<XElement> CreateInvoiceLines(ICollection<InvoiceLine>? lines, string currencyCode)
         {
             if (lines == null || !lines.Any())
                 yield break;
@@ -91,7 +95,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                         new XAttribute("unitCode", MapUnitCode(line.Unit)),
                         FormatQuantity(line.Quantity)),
                     new XElement(NS_CBC + "LineExtensionAmount",
-                        new XAttribute("currencyID", "RON"),
+                        new XAttribute("currencyID", currencyCode),
                         FormatDecimal(lineTotal)),
                     new XElement(NS_CAC + "Item",
                         new XElement(NS_CBC + "Name", line.Description ?? ""),
@@ -102,7 +106,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                                 new XElement(NS_CBC + "ID", "VAT")))),
                     new XElement(NS_CAC + "Price",
                         new XElement(NS_CBC + "PriceAmount",
-                            new XAttribute("currencyID", "RON"),
+                            new XAttribute("currencyID", currencyCode),
                             FormatDecimal(line.UnitPrice)))
                 );
 
@@ -117,6 +121,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         private XElement CreateCreditNoteElement(Invoice invoice)
         {
             var (lineExtensionTotal, taxTotal, taxGroups) = CalculateTotals(invoice);
+            var currencyCode = GetCurrencyCode(invoice.Currency);
 
             var elements = new List<object?>
             {
@@ -128,15 +133,18 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                 new XElement(NS_CBC + "ID", $"{invoice.Series} nr. {invoice.Number}"),
                 new XElement(NS_CBC + "IssueDate", invoice.Date.ToString("yyyy-MM-dd")),
                 new XElement(NS_CBC + "CreditNoteTypeCode", "381"),
-                new XElement(NS_CBC + "DocumentCurrencyCode", "RON")
+                new XElement(NS_CBC + "DocumentCurrencyCode", currencyCode)
             };
+
+            if (invoice.Currency != Currency.RON)
+                elements.Add(new XElement(NS_CBC + "TaxCurrencyCode", "RON"));
 
             elements.Add(CreateBillingReference(invoice.OriginalInvoice!));
             elements.Add(CreateSupplierParty(invoice.Company!));
             elements.Add(CreateCustomerParty(invoice.Client!));
-            elements.Add(CreateTaxTotal(taxTotal, taxGroups));
-            elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal));
-            elements.AddRange(CreateCreditNoteLines(invoice.InvoiceLines));
+            elements.Add(CreateTaxTotal(taxTotal, taxGroups, currencyCode));
+            elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal, currencyCode));
+            elements.AddRange(CreateCreditNoteLines(invoice.InvoiceLines, currencyCode));
 
             return new XElement(NS_CREDIT_NOTE + "CreditNote", elements.Where(e => e != null));
         }
@@ -151,7 +159,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
             );
         }
 
-        private IEnumerable<XElement> CreateCreditNoteLines(ICollection<InvoiceLine>? lines)
+        private IEnumerable<XElement> CreateCreditNoteLines(ICollection<InvoiceLine>? lines, string currencyCode)
         {
             if (lines == null || !lines.Any())
                 yield break;
@@ -167,7 +175,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                         new XAttribute("unitCode", MapUnitCode(line.Unit)),
                         FormatQuantity(line.Quantity)),
                     new XElement(NS_CBC + "LineExtensionAmount",
-                        new XAttribute("currencyID", "RON"),
+                        new XAttribute("currencyID", currencyCode),
                         FormatDecimal(lineTotal)),
                     new XElement(NS_CAC + "Item",
                         new XElement(NS_CBC + "Name", line.Description ?? ""),
@@ -178,7 +186,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                                 new XElement(NS_CBC + "ID", "VAT")))),
                     new XElement(NS_CAC + "Price",
                         new XElement(NS_CBC + "PriceAmount",
-                            new XAttribute("currencyID", "RON"),
+                            new XAttribute("currencyID", currencyCode),
                             FormatDecimal(line.UnitPrice)))
                 );
 
@@ -243,15 +251,15 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
             );
         }
 
-        private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups)
+        private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups, string currencyCode)
         {
             var taxSubtotals = taxGroups.Select(g =>
                 new XElement(NS_CAC + "TaxSubtotal",
                     new XElement(NS_CBC + "TaxableAmount",
-                        new XAttribute("currencyID", "RON"),
+                        new XAttribute("currencyID", currencyCode),
                         FormatDecimal(g.Value.taxableAmount)),
                     new XElement(NS_CBC + "TaxAmount",
-                        new XAttribute("currencyID", "RON"),
+                        new XAttribute("currencyID", currencyCode),
                         FormatDecimal(g.Value.taxAmount)),
                     new XElement(NS_CAC + "TaxCategory",
                         new XElement(NS_CBC + "ID", GetTaxCategoryCode(g.Key)),
@@ -262,28 +270,28 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
 
             return new XElement(NS_CAC + "TaxTotal",
                 new XElement(NS_CBC + "TaxAmount",
-                    new XAttribute("currencyID", "RON"),
+                    new XAttribute("currencyID", currencyCode),
                     FormatDecimal(totalTax)),
                 taxSubtotals
             );
         }
 
-        private XElement CreateLegalMonetaryTotal(decimal lineExtensionTotal, decimal taxTotal)
+        private XElement CreateLegalMonetaryTotal(decimal lineExtensionTotal, decimal taxTotal, string currencyCode)
         {
             var totalWithTax = lineExtensionTotal + taxTotal;
 
             return new XElement(NS_CAC + "LegalMonetaryTotal",
                 new XElement(NS_CBC + "LineExtensionAmount",
-                    new XAttribute("currencyID", "RON"),
+                    new XAttribute("currencyID", currencyCode),
                     FormatDecimal(lineExtensionTotal)),
                 new XElement(NS_CBC + "TaxExclusiveAmount",
-                    new XAttribute("currencyID", "RON"),
+                    new XAttribute("currencyID", currencyCode),
                     FormatDecimal(lineExtensionTotal)),
                 new XElement(NS_CBC + "TaxInclusiveAmount",
-                    new XAttribute("currencyID", "RON"),
+                    new XAttribute("currencyID", currencyCode),
                     FormatDecimal(totalWithTax)),
                 new XElement(NS_CBC + "PayableAmount",
-                    new XAttribute("currencyID", "RON"),
+                    new XAttribute("currencyID", currencyCode),
                     FormatDecimal(totalWithTax))
             );
         }
@@ -318,6 +326,12 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         #endregion
 
         #region Helpers
+
+        private static string GetCurrencyCode(Currency currency) => currency switch
+        {
+            Currency.EUR => "EUR",
+            _ => "RON"
+        };
 
         private static string FormatCUI(string? cui)
         {

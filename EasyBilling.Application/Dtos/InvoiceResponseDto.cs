@@ -12,6 +12,7 @@ public class InvoiceResponseDto
     public decimal TotalVat { get; set; }
     public decimal GrandTotal { get; set; }
     public InvoiceType Type { get; set; } = InvoiceType.Invoice;
+    public Currency Currency { get; set; } = Currency.RON;
 
     public Guid? OriginalInvoiceId { get; set; }
     public string OriginalInvoiceNumber { get; set; } = default!;

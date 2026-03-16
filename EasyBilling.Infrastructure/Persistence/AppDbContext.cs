@@ -57,6 +57,10 @@ namespace EasyBilling.Infrastructure.Persistence
                     .HasConversion<int>()
                     .HasDefaultValue(InvoiceType.Invoice);
 
+                entity.Property(e => e.Currency)
+                    .HasConversion<int>()
+                    .HasDefaultValue(Currency.RON);
+
                 entity.HasOne(e => e.OriginalInvoice)
                     .WithMany(e => e.CreditNotes)
                     .HasForeignKey(e => e.OriginalInvoiceId)

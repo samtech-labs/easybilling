@@ -77,11 +77,11 @@ public class MembershipService : IMembershipService
             throw new InvalidOperationException($"Membership type with ID '{request.MembershipTypeId}' not found.");
         }
 
-        // Check if user already has an active membership and delete it
-        var activeMembership = await _membershipRepository.GetActiveMembershipByUserIdAsync(request.UserId, cancellationToken);
-        if (activeMembership != null)
+        // Check if user already has a membership (active or expired) and delete it
+        var existingMemberships = await _membershipRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        foreach (var existing in existingMemberships)
         {
-            await _membershipRepository.DeleteAsync(activeMembership.Id, cancellationToken);
+            await _membershipRepository.DeleteAsync(existing.Id, cancellationToken);
         }
 
         // Calculate end date based on membership type duration

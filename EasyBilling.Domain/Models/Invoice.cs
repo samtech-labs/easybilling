@@ -12,6 +12,7 @@ namespace EasyBilling.Domain.Models
         public required string Series { get; set; }
         public required int Number { get; set; }
         public InvoiceType Type { get; set; } = InvoiceType.Invoice;
+        public Currency Currency { get; set; } = Currency.RON;
 
         // For CreditNote, reference the original invoice
         public Guid? OriginalInvoiceId { get; set; }
