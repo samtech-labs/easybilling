@@ -7,9 +7,10 @@ using EasyBilling.Domain.Models;
 
 namespace EasyBilling.Application.Services;
 
-public class UserService(IUserRepository userRepository) : IUserService
+public class UserService(IUserRepository userRepository, IPasswordHasher passwordHasher) : IUserService
 {
     private readonly IUserRepository _userRepository = userRepository;
+    private readonly IPasswordHasher _passwordHasher = passwordHasher;
 
     public async Task<UserResponseDto> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
@@ -50,7 +51,7 @@ public class UserService(IUserRepository userRepository) : IUserService
         {
             Id = Guid.NewGuid(),
             Username = request.Username,
-            Password = request.Password,
+            Password = _passwordHasher.Hash(request.Password),
             Email = request.Email,
             Role = request.Role
         };
@@ -79,7 +80,7 @@ public class UserService(IUserRepository userRepository) : IUserService
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
-            user.Password = request.Password; // Note: In production, hash this password!
+            user.Password = _passwordHasher.Hash(request.Password);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Email) && request.Email != user.Email)

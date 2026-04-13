@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using EasyBilling.Application.Interfaces.Services;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -12,11 +13,13 @@ public class AuthService
 {
     private readonly AppDbContext _dbContext;
     private readonly IConfiguration _configuration;
+    private readonly IPasswordHasher _passwordHasher;
 
-    public AuthService(AppDbContext dbContext, IConfiguration configuration)
+    public AuthService(AppDbContext dbContext, IConfiguration configuration, IPasswordHasher passwordHasher)
     {
         _dbContext = dbContext;
         _configuration = configuration;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<string?> AuthenticateAndGenerateTokenAsync(string username, string password)
@@ -24,7 +27,7 @@ public class AuthService
         var user = await _dbContext.Users
             .FirstOrDefaultAsync(u => u.Username == username);
 
-        if (user == null || user.Password != password)
+        if (user == null || !_passwordHasher.Verify(password, user.Password))
             return null;
 
         var jwtSection = _configuration.GetSection("JwtSettings");
