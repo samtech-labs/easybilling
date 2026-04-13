@@ -117,6 +117,7 @@ builder.Services.AddScoped<IAnafIntegrationHelper, AnafIntegrationHelper>();
 builder.Services.AddScoped<IInvoiceAnafSubmissionRepository, InvoiceAnafSubmissionRepository>();
 builder.Services.AddScoped<AnafStatusCheckJob>();
 builder.Services.AddScoped<IInvoiceAnafSubmissionService, InvoiceAnafSubmissionService>();
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserContext>();
 

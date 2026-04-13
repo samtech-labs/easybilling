@@ -371,20 +371,31 @@ namespace EasyBilling.Application.Services
 
             QuestPDF.Settings.License = LicenseType.Community;
 
-            // --- Color palette (soft teal/slate) ---
-            var primaryColor = "#0F766E";   // Teal-700 — rich but easy on the eyes
-            var primaryLight = "#CCFBF1";   // Teal-100 — soft background tint
-            var primaryMid = "#99F6E4";     // Teal-200 — subtle accent
+            // --- Color palette (blue/slate) ---
+            var primaryColor = "#2563EB";   // Blue-600 — clean, professional blue
+            var primaryDark = "#1E40AF";    // Blue-800 — for text emphasis
+            var primaryLight = "#EFF6FF";   // Blue-50 — very subtle tint for backgrounds
             var darkText = "#1E293B";       // Slate-800
             var mutedText = "#64748B";      // Slate-500
-            var lightBg = "#F8FAFC";        // Slate-50 — very subtle alternating row
+            var lightBg = "#F8FAFC";        // Slate-50 — alternating row
             var borderColor = "#E2E8F0";    // Slate-200
             var white = "#FFFFFF";
+
+            // --- Number formatting (Romanian standard: space as thousand separator) ---
+            var roNumberFormat = new System.Globalization.NumberFormatInfo
+            {
+                NumberDecimalSeparator = ".",
+                NumberGroupSeparator = " ",
+                NumberGroupSizes = new[] { 3 }
+            };
+
+            string FormatAmount(decimal amount) => amount.ToString("#,##0.00", roNumberFormat);
 
             // --- Calculations ---
             var lines = invoice.InvoiceLines?.ToList() ?? new List<InvoiceLine>();
             var vatRates = lines.Select(l => l.VatRate).Distinct().ToList();
             var vatRateDisplay = vatRates.Count == 1 ? $"{vatRates[0]}%" : "Diverse";
+            var currencyLabel = GetCurrencyLabel(invoice.Currency);
 
             decimal subtotal = lines.Sum(l => l.Quantity * l.UnitPrice);
             decimal totalVat = lines.Sum(l => l.Quantity * l.UnitPrice * l.VatRate / 100);
@@ -402,159 +413,175 @@ namespace EasyBilling.Application.Services
                     // ===== HEADER =====
                     page.Header().Column(header =>
                     {
-                        // Blue accent bar at very top
+                        // Accent bar at very top
                         header.Item().Height(4).Background(primaryColor);
 
-                        header.Item().PaddingTop(15).Row(row =>
+                        header.Item().PaddingTop(18).Row(row =>
                         {
                             row.RelativeItem().Column(col =>
                             {
                                 col.Item().Text("FACTURA")
-                                    .FontSize(26)
+                                    .FontSize(28)
                                     .Bold()
-                                    .FontColor(primaryColor)
-                                    .LetterSpacing(0.05f);
+                                    .FontColor(primaryDark)
+                                    .LetterSpacing(0.08f);
 
-                                col.Item().PaddingTop(4).Text(text =>
+                                col.Item().PaddingTop(6).Text(text =>
                                 {
-                                    text.Span("Seria ").FontColor(mutedText);
-                                    text.Span(invoice.Series).Bold();
-                                    text.Span("  Nr. ").FontColor(mutedText);
-                                    text.Span(invoice.Number.ToString()).Bold();
-                                    text.Span("  din ").FontColor(mutedText);
-                                    text.Span(invoice.Date.ToString("dd.MM.yyyy")).Bold();
+                                    text.Span("Seria ").FontSize(10).FontColor(mutedText);
+                                    text.Span(invoice.Series).FontSize(10).Bold();
+                                    text.Span("  Nr. ").FontSize(10).FontColor(mutedText);
+                                    text.Span(invoice.Number.ToString()).FontSize(10).Bold();
+                                    text.Span("  din ").FontSize(10).FontColor(mutedText);
+                                    text.Span(invoice.Date.ToString("dd.MM.yyyy")).FontSize(10).Bold();
                                 });
                             });
 
-                            row.ConstantItem(120).AlignRight().AlignMiddle().Column(col =>
+                            row.ConstantItem(180).AlignRight().AlignMiddle().Text(text =>
                             {
-                                col.Item().Text("Cota TVA").FontSize(8).FontColor(mutedText);
-                                col.Item().Text(vatRateDisplay)
-                                    .FontSize(18)
-                                    .Bold()
-                                    .FontColor(primaryColor);
+                                text.Span("Cota TVA ").FontSize(10).FontColor(mutedText);
+                                text.Span(vatRateDisplay).FontSize(10).Bold().FontColor(primaryDark);
                             });
                         });
 
                         // Divider line below header
-                        header.Item().PaddingTop(10).LineHorizontal(1).LineColor(borderColor);
+                        header.Item().PaddingTop(12).LineHorizontal(1.5f).LineColor(primaryColor);
                     });
 
                     // ===== CONTENT =====
-                    page.Content().PaddingTop(15).Column(col =>
+                    page.Content().PaddingTop(18).Column(col =>
                     {
                         // --- Supplier / Client boxes ---
                         col.Item().Row(row =>
                         {
                             // Supplier box
-                            row.RelativeItem().Border(1).BorderColor(borderColor).Padding(12).Column(c =>
-                            {
-                                c.Item().PaddingBottom(6).Text("FURNIZOR")
-                                    .FontSize(8)
-                                    .Bold()
-                                    .FontColor(primaryColor)
-                                    .LetterSpacing(0.1f);
-
-                                c.Item().Text(invoice.Company.Name)
-                                    .FontSize(11)
-                                    .Bold();
-
-                                c.Item().PaddingTop(6).Table(t =>
+                            row.RelativeItem().BorderLeft(3).BorderColor(primaryColor)
+                                .Background(primaryLight).Padding(14).Column(c =>
                                 {
-                                    t.ColumnsDefinition(columns =>
+                                    c.Item().PaddingBottom(8).Text("FURNIZOR")
+                                        .FontSize(8)
+                                        .Bold()
+                                        .FontColor(primaryColor)
+                                        .LetterSpacing(0.12f);
+
+                                    c.Item().Text(invoice.Company.Name)
+                                        .FontSize(12)
+                                        .Bold();
+
+                                    c.Item().PaddingTop(8).Table(t =>
                                     {
-                                        columns.ConstantColumn(70);
-                                        columns.RelativeColumn();
+                                        t.ColumnsDefinition(columns =>
+                                        {
+                                            columns.ConstantColumn(72);
+                                            columns.RelativeColumn();
+                                        });
+
+                                        AddDetailRow(t, "CIF:", invoice.Company.CUI, mutedText);
+                                        AddDetailRow(t, "Reg. com.:", invoice.Company.RegNumber, mutedText);
+                                        AddDetailRow(t, "Adresa:", invoice.Company.Address, mutedText);
+                                        AddDetailRow(t, "Județ:", invoice.Company.County, mutedText);
+                                        AddDetailRow(t, "IBAN:", invoice.Company.IBAN, mutedText);
+                                        AddDetailRow(t, "Banca:", invoice.Company.Bank, mutedText);
                                     });
-
-                                    AddDetailRow(t, "CIF:", invoice.Company.CUI, mutedText);
-                                    AddDetailRow(t, "Reg. com.:", invoice.Company.RegNumber, mutedText);
-                                    AddDetailRow(t, "Adresa:", invoice.Company.Address, mutedText);
-                                    AddDetailRow(t, "Județ:", invoice.Company.County, mutedText);
-                                    AddDetailRow(t, "IBAN:", invoice.Company.IBAN, mutedText);
-                                    AddDetailRow(t, "Banca:", invoice.Company.Bank, mutedText);
                                 });
-                            });
 
-                            row.ConstantItem(15); // Spacer between boxes
+                            row.ConstantItem(16); // Spacer
 
                             // Client box
-                            row.RelativeItem().Border(1).BorderColor(borderColor).Padding(12).Column(c =>
-                            {
-                                c.Item().PaddingBottom(6).Text("CLIENT")
-                                    .FontSize(8)
-                                    .Bold()
-                                    .FontColor(primaryColor)
-                                    .LetterSpacing(0.1f);
-
-                                c.Item().Text(invoice.Client.Name)
-                                    .FontSize(11)
-                                    .Bold();
-
-                                c.Item().PaddingTop(6).Table(t =>
+                            row.RelativeItem().BorderLeft(3).BorderColor(borderColor)
+                                .Background(lightBg).Padding(14).Column(c =>
                                 {
-                                    t.ColumnsDefinition(columns =>
-                                    {
-                                        columns.ConstantColumn(70);
-                                        columns.RelativeColumn();
-                                    });
+                                    c.Item().PaddingBottom(8).Text("CLIENT")
+                                        .FontSize(8)
+                                        .Bold()
+                                        .FontColor(primaryColor)
+                                        .LetterSpacing(0.12f);
 
-                                    AddDetailRow(t, "CIF:", invoice.Client.CUI, mutedText);
-                                    AddDetailRow(t, "Reg. com.:", invoice.Client.RegNumber, mutedText);
-                                    AddDetailRow(t, "Adresa:", invoice.Client.Address, mutedText);
-                                    AddDetailRow(t, "Județ:", invoice.Client.County, mutedText);
+                                    c.Item().Text(invoice.Client.Name)
+                                        .FontSize(12)
+                                        .Bold();
+
+                                    c.Item().PaddingTop(8).Table(t =>
+                                    {
+                                        t.ColumnsDefinition(columns =>
+                                        {
+                                            columns.ConstantColumn(72);
+                                            columns.RelativeColumn();
+                                        });
+
+                                        AddDetailRow(t, "CIF:", invoice.Client.CUI, mutedText);
+                                        AddDetailRow(t, "Reg. com.:", invoice.Client.RegNumber, mutedText);
+                                        AddDetailRow(t, "Adresa:", invoice.Client.Address, mutedText);
+                                        AddDetailRow(t, "Județ:", invoice.Client.County, mutedText);
+                                    });
                                 });
-                            });
                         });
 
-                        col.Item().Height(20); // Spacing
+                        col.Item().Height(22); // Spacing
 
                         // --- Products/Services section header ---
-                        col.Item().PaddingBottom(8).Text("PRODUSE / SERVICII")
+                        col.Item().PaddingBottom(10).Text("PRODUSE / SERVICII")
                             .FontSize(8)
                             .Bold()
                             .FontColor(primaryColor)
-                            .LetterSpacing(0.1f);
+                            .LetterSpacing(0.12f);
 
                         // --- Table ---
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.ConstantColumn(25);    // #
+                                columns.ConstantColumn(28);    // #
                                 columns.RelativeColumn(3);     // Denumire
-                                columns.ConstantColumn(40);    // U.M.
-                                columns.ConstantColumn(45);    // Cant.
-                                columns.ConstantColumn(75);    // Preț fără TVA
-                                columns.ConstantColumn(75);    // Valoare
-                                columns.ConstantColumn(75);    // Valoare TVA
+                                columns.ConstantColumn(45);    // U.M.
+                                columns.ConstantColumn(50);    // Cant.
+                                columns.ConstantColumn(85);    // Preț fără TVA
+                                columns.ConstantColumn(85);    // Valoare
+                                columns.ConstantColumn(85);    // Valoare TVA
                             });
 
-                            // Table header with blue background
+                            // Table header — clean style with bottom border
                             table.Header(header =>
                             {
                                 var headerStyle = TextStyle.Default
                                     .FontSize(8)
                                     .Bold()
-                                    .FontColor(white);
+                                    .FontColor(darkText);
 
-                                header.Cell().Background(primaryColor).Padding(6)
+                                var currencyStyle = TextStyle.Default
+                                    .FontSize(7)
+                                    .FontColor(primaryColor);
+
+                                // Main header row
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6)
                                     .Text("#").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6)
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6)
                                     .Text("Denumire").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6).AlignCenter()
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6).AlignCenter()
                                     .Text("U.M.").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6).AlignCenter()
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6).AlignCenter()
                                     .Text("Cant.").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6).AlignRight()
-                                    .Text("Preț fără TVA").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6).AlignRight()
-                                    .Text("Valoare").Style(headerStyle);
-                                header.Cell().Background(primaryColor).Padding(6).AlignRight()
-                                    .Text("Valoare TVA").Style(headerStyle);
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6).AlignRight()
+                                    .Column(c =>
+                                    {
+                                        c.Item().AlignRight().Text("Preț fără TVA").Style(headerStyle);
+                                        c.Item().AlignRight().Text(currencyLabel).Style(currencyStyle);
+                                    });
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6).AlignRight()
+                                    .Column(c =>
+                                    {
+                                        c.Item().AlignRight().Text("Valoare").Style(headerStyle);
+                                        c.Item().AlignRight().Text(currencyLabel).Style(currencyStyle);
+                                    });
+                                header.Cell().BorderBottom(1.5f).BorderColor(primaryColor).Padding(6).AlignRight()
+                                    .Column(c =>
+                                    {
+                                        c.Item().AlignRight().Text("Valoare TVA").Style(headerStyle);
+                                        c.Item().AlignRight().Text(currencyLabel).Style(currencyStyle);
+                                    });
                             });
 
-                            // Table rows with alternating backgrounds
+                            // Table rows with subtle alternating backgrounds
                             var index = 1;
                             foreach (var item in lines)
                             {
@@ -564,20 +591,20 @@ namespace EasyBilling.Application.Services
 
                                 var cellStyle = TextStyle.Default.FontSize(9);
 
-                                table.Cell().Background(rowBg).Padding(5)
-                                    .Text(index.ToString()).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5)
-                                    .Text(item.Description).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5).AlignCenter()
-                                    .Text(item.Unit).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5).AlignCenter()
-                                    .Text(item.Quantity.ToString("0.##")).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5).AlignRight()
-                                    .Text(item.UnitPrice.ToString("0.00")).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5).AlignRight()
-                                    .Text(lineTotal.ToString("0.00")).Style(cellStyle);
-                                table.Cell().Background(rowBg).Padding(5).AlignRight()
-                                    .Text(lineVat.ToString("0.00")).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).Text(index.ToString()).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).Text(item.Description).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).AlignCenter().Text(item.Unit).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).AlignCenter().Text(item.Quantity.ToString("0.##")).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).AlignRight().Text(FormatAmount(item.UnitPrice)).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).AlignRight().Text(FormatAmount(lineTotal)).Style(cellStyle);
+                                table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(borderColor)
+                                    .Padding(6).AlignRight().Text(FormatAmount(lineVat)).Style(cellStyle);
 
                                 index++;
                             }
@@ -585,58 +612,61 @@ namespace EasyBilling.Application.Services
                             // Total row
                             var totalStyle = TextStyle.Default.FontSize(9).Bold();
 
-                            table.Cell().ColumnSpan(4).Background(lightBg)
-                                .BorderTop(1).BorderColor(borderColor)
-                                .Padding(6).AlignRight()
+                            table.Cell().ColumnSpan(4)
+                                .BorderTop(1).BorderColor(primaryColor)
+                                .PaddingVertical(8).PaddingHorizontal(6).AlignRight()
                                 .Text("Total").Style(totalStyle);
-                            table.Cell().Background(lightBg)
-                                .BorderTop(1).BorderColor(borderColor)
-                                .Padding(6).AlignRight()
-                                .Text(subtotal.ToString("0.00")).Style(totalStyle);
-                            table.Cell().Background(lightBg)
-                                .BorderTop(1).BorderColor(borderColor)
-                                .Padding(6).AlignRight()
-                                .Text(subtotal.ToString("0.00")).Style(totalStyle);
-                            table.Cell().Background(lightBg)
-                                .BorderTop(1).BorderColor(borderColor)
-                                .Padding(6).AlignRight()
-                                .Text(totalVat.ToString("0.00")).Style(totalStyle);
+                            table.Cell()
+                                .BorderTop(1).BorderColor(primaryColor)
+                                .PaddingVertical(8).PaddingHorizontal(6).AlignRight()
+                                .Text(FormatAmount(subtotal)).Style(totalStyle);
+                            table.Cell()
+                                .BorderTop(1).BorderColor(primaryColor)
+                                .PaddingVertical(8).PaddingHorizontal(6).AlignRight()
+                                .Text(FormatAmount(subtotal)).Style(totalStyle);
+                            table.Cell()
+                                .BorderTop(1).BorderColor(primaryColor)
+                                .PaddingVertical(8).PaddingHorizontal(6).AlignRight()
+                                .Text(FormatAmount(totalVat)).Style(totalStyle);
                         });
 
-                        col.Item().Height(15);
+                        col.Item().Height(12);
 
-                        // --- Grand total (light tinted box) ---
-                        col.Item().AlignRight()
-                            .Border(1).BorderColor(primaryColor)
-                            .Background(primaryLight)
-                            .Padding(12)
-                            .Row(r =>
+                        // --- Grand total box ---
+                        col.Item().Row(grandRow =>
+                        {
+                            // Întocmit de on the left
+                            grandRow.RelativeItem().AlignBottom().PaddingBottom(4).Text(text =>
                             {
-                                r.AutoItem().Text("Total factură: ")
-                                    .FontSize(13)
-                                    .FontColor(mutedText);
-                                r.AutoItem().Text($"{grandTotal:0.00} {GetCurrencyLabel(invoice.Currency)}")
-                                    .FontSize(14)
-                                    .Bold()
-                                    .FontColor(primaryColor);
+                                text.Span("Întocmit de: ").FontSize(9).FontColor(mutedText);
+                                text.Span(""); // name if available
                             });
 
-                        col.Item().Height(20);
-
-                        // --- Prepared by ---
-                        col.Item().Text(text =>
-                        {
-                            text.Span("Întocmit de: ").FontColor(mutedText);
-                            text.Span(""); // name if available
+                            // Total factură box on the right
+                            grandRow.ConstantItem(280)
+                                .Border(1.5f).BorderColor(primaryColor)
+                                .Padding(10)
+                                .Row(r =>
+                                {
+                                    r.RelativeItem().AlignMiddle().Text("Total factură")
+                                        .FontSize(11)
+                                        .Bold()
+                                        .FontColor(darkText);
+                                    r.AutoItem().AlignMiddle().AlignRight()
+                                        .Text(FormatAmount(grandTotal) + " " + currencyLabel)
+                                        .FontSize(14)
+                                        .Bold()
+                                        .FontColor(primaryDark);
+                                });
                         });
                     });
 
                     // ===== FOOTER =====
                     page.Footer().Column(footer =>
                     {
-                        footer.Item().LineHorizontal(1).LineColor(borderColor);
+                        footer.Item().LineHorizontal(1.5f).LineColor(primaryColor);
 
-                        footer.Item().PaddingTop(8).Row(row =>
+                        footer.Item().PaddingTop(10).Row(row =>
                         {
                             var footerStyle = TextStyle.Default.FontSize(7).FontColor(mutedText);
 
@@ -661,14 +691,14 @@ namespace EasyBilling.Application.Services
                             });
                         });
 
-                        footer.Item().PaddingTop(6).AlignCenter()
-                            .Text("Emis cu EasyBilling — program de facturare")
+                        footer.Item().PaddingTop(8).AlignCenter()
+                            .Text("Emis cu EasyBilling — easybilling.ro")
                             .FontSize(7)
                             .FontColor(primaryColor)
                             .Bold();
 
                         // Bottom accent bar
-                        footer.Item().PaddingTop(8).Height(3).Background(primaryColor);
+                        footer.Item().PaddingTop(6).Height(3).Background(primaryColor);
                     });
                 });
             }).GeneratePdf();
@@ -681,14 +711,15 @@ namespace EasyBilling.Application.Services
         {
             if (string.IsNullOrWhiteSpace(value)) return;
 
-            table.Cell().PaddingVertical(1)
+            table.Cell().PaddingVertical(2)
                 .Text(label)
                 .FontSize(8)
                 .FontColor(mutedColor);
 
-            table.Cell().PaddingVertical(1)
+            table.Cell().PaddingVertical(2)
                 .Text(value)
-                .FontSize(9);
+                .FontSize(9)
+                .Bold();
         }
 
         public async Task<string> GenerateXmlForAnaf(Guid invoiceId, CancellationToken cancellationToken = default)
@@ -857,7 +888,7 @@ namespace EasyBilling.Application.Services
             }
 
             var series = request.Series ?? originalInvoice.Series;
-            
+
             var nextNumber = await _invoiceRepository.GetLastInvoiceBySeriesAsync(originalInvoice.CompanyId, series, cancellationToken);
             var number = request.Number != null && int.TryParse(request.Number, out var parsedNumber)
                 ? parsedNumber
@@ -877,7 +908,8 @@ namespace EasyBilling.Application.Services
                     VatRate = line.VatRate > 0 ? line.VatRate : 0,
                     Unit = line.Unit ?? "buc"
                 }).ToList();
-            } else
+            }
+            else
             {
                 lines = originalInvoice.InvoiceLines.Select(l => new InvoiceLine
                 {
@@ -930,7 +962,7 @@ namespace EasyBilling.Application.Services
 
             return MapInvoiceToDto(result);
         }
-        
+
         public async Task<List<Invoice>> GetAllForUserByPeriodAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
         {
             var user = await _userService.GetUserByIdAsync(userId, cancellationToken);
