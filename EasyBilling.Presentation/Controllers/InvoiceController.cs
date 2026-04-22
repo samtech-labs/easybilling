@@ -197,6 +197,34 @@ namespace EasyBilling.Presentation.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("DownloadXml")]
+        public async Task<IActionResult> DownloadXml(Guid invoiceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var invoice = await _invoiceService.GetInvoiceAsync(invoiceId, cancellationToken);
+                if (invoice == null)
+                {
+                    return NotFound(new { message = "Invoice not found." });
+                }
+
+                var xml = await _invoiceService.GenerateXmlForAnaf(invoiceId, cancellationToken);
+                var xmlBytes = System.Text.Encoding.UTF8.GetBytes(xml);
+                var fileName = $"{invoice.Series}_{invoice.Number}.xml";
+
+                return File(xmlBytes, "application/xml", fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while generating the invoice XML.");
+            }
+        }
+
         [HttpPost]
         [Route("SendEFactura")]
         [Authorize(Policy = Policies.CanUseEFactura)]
