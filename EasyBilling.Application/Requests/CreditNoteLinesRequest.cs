@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using EasyBilling.Domain.Models;
+using System.Text.Json.Serialization;
 
 namespace EasyBilling.Application.Requests
 {
@@ -12,6 +13,6 @@ namespace EasyBilling.Application.Requests
         [JsonPropertyName("vat")]
         public decimal Vat { get; set; }
 
-        public string Unit { get; set; } = "buc";
+        public string Unit { get; set; } = UnitOfMeasure.Default;
     }
 }

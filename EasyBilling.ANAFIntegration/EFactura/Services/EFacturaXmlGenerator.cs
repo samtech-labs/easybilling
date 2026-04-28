@@ -92,7 +92,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                 yield return new XElement(NS_CAC + "InvoiceLine",
                     new XElement(NS_CBC + "ID", lineNumber.ToString()),
                     new XElement(NS_CBC + "InvoicedQuantity",
-                        new XAttribute("unitCode", MapUnitCode(line.Unit)),
+                        new XAttribute("unitCode", UnitCodeMapper.Map(line.Unit)),
                         FormatQuantity(line.Quantity)),
                     new XElement(NS_CBC + "LineExtensionAmount",
                         new XAttribute("currencyID", currencyCode),
@@ -172,7 +172,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                 yield return new XElement(NS_CAC + "CreditNoteLine",
                     new XElement(NS_CBC + "ID", lineNumber.ToString()),
                     new XElement(NS_CBC + "CreditedQuantity",
-                        new XAttribute("unitCode", MapUnitCode(line.Unit)),
+                        new XAttribute("unitCode", UnitCodeMapper.Map(line.Unit)),
                         FormatQuantity(line.Quantity)),
                     new XElement(NS_CBC + "LineExtensionAmount",
                         new XAttribute("currencyID", currencyCode),
@@ -354,22 +354,6 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
         private static string GetTaxCategoryCode(decimal vatRate)
         {
             return vatRate == 0 ? "Z" : "S";
-        }
-
-        private static string MapUnitCode(string? unit)
-        {
-            return unit?.ToLower() switch
-            {
-                "buc" or "bucata" or "bucati" => "EA",
-                "kg" or "kilogram" => "KGM",
-                "l" or "litru" or "litri" => "LTR",
-                "m" or "metru" or "metri" => "MTR",
-                "mp" or "m2" => "MTK",
-                "ora" or "ore" => "HUR",
-                "zi" or "zile" => "DAY",
-                "luna" or "luni" => "MON",
-                _ => "EA"
-            };
         }
 
         #endregion

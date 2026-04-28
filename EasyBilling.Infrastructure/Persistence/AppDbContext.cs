@@ -45,6 +45,13 @@ namespace EasyBilling.Infrastructure.Persistence
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<InvoiceLine>(entity =>
+            {
+                entity.Property(il => il.Unit)
+                    .HasDefaultValue(UnitOfMeasure.Default)
+                    .HasMaxLength(UnitOfMeasure.MaxLength);
+            });
+
             modelBuilder.Entity<Invoice>(entity =>
             {
                 entity.HasMany(i => i.InvoiceLines)

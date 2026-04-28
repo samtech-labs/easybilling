@@ -203,7 +203,7 @@ namespace EasyBilling.Application.Services
                         Quantity = line.Quantity,
                         UnitPrice = line.UnitPrice,
                         VatRate = vatRate,
-                        Unit = line.Unit ?? "buc"
+                        Unit = UnitOfMeasure.NormalizeOrDefault(line.Unit)
                     };
                 }).ToList()
             };
@@ -906,7 +906,7 @@ namespace EasyBilling.Application.Services
                     Quantity = line.Quantity,
                     UnitPrice = line.UnitPrice,
                     VatRate = line.VatRate > 0 ? line.VatRate : 0,
-                    Unit = line.Unit ?? "buc"
+                    Unit = UnitOfMeasure.NormalizeOrDefault(line.Unit)
                 }).ToList();
             }
             else
@@ -919,7 +919,7 @@ namespace EasyBilling.Application.Services
                     Quantity = l.Quantity,
                     UnitPrice = l.UnitPrice,
                     VatRate = l.VatRate,
-                    Unit = l.Unit
+                    Unit = UnitOfMeasure.NormalizeOrDefault(l.Unit)
                 }).ToList();
             }
 

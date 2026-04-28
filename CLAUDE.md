@@ -81,6 +81,7 @@ Pure domain models, no external dependencies.
 - Invoice series/number must be unique per company per fiscal year
 - VAT rates: 19%, 9%, 5%, 0% (scutit), reverse charge (taxare inversa)
 - Multi-currency: RON and EUR supported; foreign currency invoices require exchange rate in UBL XML
+- Invoice line unit of measure is user-configurable (buc, ore, zi, luna, kg, m, mp, l, elem, set, etc.) — stored on each `InvoiceLine`
 
 ### EasyBilling.Application
 Business logic layer — **Repository + Service pattern** (no CQRS/MediatR).
@@ -143,6 +144,7 @@ PublicGeneralAPI/
   ← Company lookup by CUI (tax ID) via ANAF public REST API
 EFacturaXmlGenerator
   ← Converts domain Invoice entities → UBL 2.1 XML
+  ← Maps Romanian unit names to UN/ECE Recommendation 20 codes via MapUnitCode()
 ```
 
 ### EasyBilling.Api
@@ -194,6 +196,26 @@ xunit — currently targets **net9.0** (all other projects target net10.0).
 - ⚠️ `LegalMonetaryTotal/TaxInclusiveAmount` must equal `TaxExclusiveAmount + TaxTotal`
 - Foreign currency invoices require exchange rate declared in XML
 
+### Unit of Measure in UBL XML
+
+The `cbc:InvoicedQuantity` element requires a `unitCode` attribute using **UN/ECE Recommendation 20** codes.
+`EFacturaXmlGenerator.MapUnitCode()` maps Romanian unit names to these codes:
+
+| Romanian unit | UBL `unitCode` | Description |
+|---------------|----------------|-------------|
+| `buc` / `bucata` / `bucati` | `H87` | Piece |
+| `ora` / `ore` | `HUR` | Hour |
+| `zi` / `zile` | `DAY` | Day |
+| `luna` / `luni` | `MON` | Month |
+| `kg` / `kilogram` | `KGM` | Kilogram |
+| `l` / `litru` / `litri` | `LTR` | Litre |
+| `m` / `metru` / `metri` | `MTR` | Metre |
+| `mp` / `m2` | `MTK` | Square metre |
+| *(fallback)* | `H87` | Defaults to piece |
+
+⚠️ When adding new units, ensure the `unitCode` exists in the UN/ECE Rec 20 code list — ANAF validates this.
+Common additions that may be needed: `SET` (set), `EA` (each), `XPK` (package), `C62` (dimensionless unit).
+
 ---
 
 ## Development Conventions
@@ -223,6 +245,48 @@ xunit — currently targets **net9.0** (all other projects target net10.0).
 
 > **Update this section at the start of each session.**
 
+### Configurable Invoice Line Unit of Measure
+
+**Goal:** Allow users to set the unit of measure per invoice line (currently defaults to "buc").
+Common Romanian units: buc (piece), ore (hours), zile (days), luni (months), elem (element), set, kg, m, mp, l.
+
+**Scope — changes required across all layers:**
+
+#### Domain (`EasyBilling.Domain`)
+- `InvoiceLine.Unit` property already exists as `string`
+- Add a `UnitOfMeasure` constants class or enum with predefined values + allow freetext
+- Default value should remain `"buc"` for backward compatibility
+
+#### Application (`EasyBilling.Application`)
+- `CreateInvoiceLineRequest` / `UpdateInvoiceLineRequest` — expose `Unit` field (string, optional, defaults to `"buc"`)
+- `InvoiceLineDto` — include `Unit` in response DTO
+- `InvoiceService` — pass `Unit` through when creating/updating lines; validate against known units or accept freetext
+- FluentValidation: `Unit` should not be empty; max length ~20 chars
+
+#### ANAF Integration (`EasyBilling.ANAFIntegration`)
+- `EFacturaXmlGenerator.MapUnitCode()` already handles the Romanian-to-UBL mapping
+- Verify the mapping covers all units exposed in the UI; extend if needed (e.g. `elem` → `C62`, `set` → `SET`)
+- Unit tests for `MapUnitCode` — ensure every UI-exposed unit maps to a valid UBL code
+
+#### Presentation (`EasyBilling.Presentation`)
+- Invoice controller already passes through request models — no changes expected unless adding a `GET /units` lookup endpoint
+- Consider a `GET /api/units` endpoint returning the list of supported units with labels (for frontend dropdown)
+
+#### Frontend (Next.js)
+- Invoice create/edit form: add a unit selector (dropdown/combobox) per invoice line, defaulting to "buc"
+- Populate options from API or hardcode the common set: `buc`, `ore`, `zile`, `luni`, `kg`, `m`, `mp`, `l`, `elem`, `set`
+- Invoice list/detail views: display the unit alongside quantity
+- PDF preview: unit already renders from `InvoiceLine.Unit`
+
+#### QuestPDF (Invoice PDF Generation)
+- Verify `InvoiceLine.Unit` is rendered in the quantity column of the PDF template
+- If currently hardcoded to "buc", update to use the line's `Unit` value
+
+#### Migration
+- If `InvoiceLine.Unit` column already exists in DB with no default, add a migration setting default to `'buc'`
+- Backfill existing rows: `UPDATE invoice_lines SET unit = 'buc' WHERE unit IS NULL`
+
+### Other Active Items
 - [ ] ANAF OAuth token refresh edge cases (concurrent requests, refresh race condition)
 - [ ] Credit note XML — `BillingReference` mapping
 - [ ] Membership invite flow (email invite → accept → role assignment)
