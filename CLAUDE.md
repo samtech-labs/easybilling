@@ -69,7 +69,7 @@ ANAFIntegration  (standalone, referenced by Application)
 Pure domain models, no external dependencies.
 
 **Entities:** `User`, `Company`, `Client`, `Invoice`, `InvoiceLine`, `AnafToken`,
-`InvoiceAnafSubmission`, `Membership`, `MembershipType`
+`InvoiceAnafSubmission`, `Membership`, `MembershipType`, `BankAccount`
 
 **Enums:**
 - `UserRole` — `ADMIN`, `USER`, `ACCOUNTANT`
@@ -82,6 +82,7 @@ Pure domain models, no external dependencies.
 - VAT rates: 19%, 9%, 5%, 0% (scutit), reverse charge (taxare inversa)
 - Multi-currency: RON and EUR supported; foreign currency invoices require exchange rate in UBL XML
 - Invoice line unit of measure is user-configurable (buc, ore, zi, luna, kg, m, mp, l, elem, set, etc.) — stored on each `InvoiceLine`
+- Bank accounts belong to a company (one-to-many); store bank name, IBAN, and currency (RON/EUR)
 
 ### EasyBilling.Application
 Business logic layer — **Repository + Service pattern** (no CQRS/MediatR).
@@ -91,6 +92,7 @@ Services/
   InvoiceService, EFacturaService, AnafIntegrationService
   ClientService, CompanyService, UserService
   MembershipService, MembershipTypeService, InvoiceAnafSubmissionService
+  BankAccountService
 Interfaces/
   Interfaces/Repositories/    ← repository contracts
   Interfaces/Services/        ← service contracts
@@ -122,7 +124,7 @@ ASP.NET Core host. **All DI registrations live in `Program.cs`** (no extension m
 
 ```
 Controllers/
-  Auth, Invoice, Company, Client, User, Membership, MembershipType, AnafIntegration
+  Auth, Invoice, Company, Client, User, Membership, MembershipType, AnafIntegration, BankAccount
 Authorization/
   CanCreateInvoice            ← enforces invoice limit per membership tier
   CanUseEFactura              ← gates e-invoice feature by membership tier
@@ -285,6 +287,89 @@ Common Romanian units: buc (piece), ore (hours), zile (days), luni (months), ele
 #### Migration
 - If `InvoiceLine.Unit` column already exists in DB with no default, add a migration setting default to `'buc'`
 - Backfill existing rows: `UPDATE invoice_lines SET unit = 'buc' WHERE unit IS NULL`
+
+### Company Bank Accounts — New Entity + Full CRUD
+
+**Goal:** Users can manage bank accounts per company. These will later be selectable on invoices (supplier IBAN in UBL XML).
+
+#### Domain (`EasyBilling.Domain`)
+
+New entity `BankAccount`:
+
+```csharp
+public class BankAccount
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Company Company { get; set; }
+    public string BankName { get; set; }    // e.g. "ING Bank", "BCR", "BT"
+    public string Iban { get; set; }        // RO-prefixed IBAN, 24 chars
+    public Currency Currency { get; set; }  // RON or EUR (reuse existing enum)
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+```
+
+- Relationship: `Company` has many `BankAccount` (one-to-many)
+- Add `ICollection<BankAccount> BankAccounts` navigation property on `Company`
+- A company can have multiple accounts (e.g. one RON, one EUR)
+- No unique constraint on IBAN per company — user may have multiple accounts at same bank
+
+#### Infrastructure (`EasyBilling.Infrastructure`)
+
+**AppDbContext** — Fluent API configuration:
+- `CompanyId` FK with cascade delete (deleting a company removes its bank accounts)
+- `BankName`: required, max length 100
+- `Iban`: required, max length 34 (ISO 13616 max)
+- `Currency`: stored as string conversion (same pattern as existing `Currency` enum usage)
+- Index on `CompanyId` for fast lookups
+
+**Repository:**
+- `IBankAccountRepository` interface in `Application/Interfaces/Repositories/`
+- `BankAccountRepository` implementation in `Infrastructure/Repositories/`
+- Methods: `GetByCompanyAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`
+- All queries scoped to company via `UserContext` — never return accounts from other companies
+
+**Migration:**
+- `dotnet ef migrations add AddBankAccount --project EasyBilling.Infrastructure --startup-project EasyBilling.Presentation`
+
+#### Application (`EasyBilling.Application`)
+
+**DTOs:**
+- `BankAccountDto` — `Id`, `BankName`, `Iban`, `Currency`, `CreatedAt`, `UpdatedAt`
+
+**Requests:**
+- `CreateBankAccountRequest` — `BankName` (required), `Iban` (required), `Currency` (required)
+- `UpdateBankAccountRequest` — same fields as create
+
+**Validation (FluentValidation):**
+- `BankName`: not empty, max 100 chars
+- `Iban`: not empty, max 34 chars, must match Romanian IBAN format (`^RO\d{2}[A-Z]{4}[A-Za-z0-9]{16}$`)
+- `Currency`: must be valid `Currency` enum value
+
+**Service:**
+- `IBankAccountService` / `BankAccountService`
+- Methods: `GetByCompanyAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`
+- All methods scoped to active company via `UserContext`
+- Throw if bank account belongs to a different company (guard against IDOR)
+
+**DI Registration:** Add repository + service in `Program.cs`
+
+#### Presentation (`EasyBilling.Presentation`)
+
+**Controller:** `BankAccountController`
+- `GET    /api/bank-accounts`          — list all for active company
+- `GET    /api/bank-accounts/{id}`     — get single
+- `POST   /api/bank-accounts`          — create
+- `PUT    /api/bank-accounts/{id}`     — update
+- `DELETE /api/bank-accounts/{id}`     — delete
+- All endpoints require `[Authorize]` + `HasActiveMembership` policy
+- Thin controller — delegate everything to `IBankAccountService`
+
+#### Future: Link to Invoices
+- Once bank accounts exist, the invoice form can offer a dropdown to select the supplier IBAN
+- The selected `BankAccountId` (or just the IBAN string) gets written into the invoice and used in UBL XML `cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID`
+- This is **out of scope** for the initial CRUD — just get the table and endpoints working first
 
 ### Other Active Items
 - [ ] ANAF OAuth token refresh edge cases (concurrent requests, refresh race condition)
