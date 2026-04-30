@@ -1,4 +1,4 @@
-﻿using EasyBilling.Infrastructure.Services;
+using EasyBilling.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyBilling.Presentation.Controllers

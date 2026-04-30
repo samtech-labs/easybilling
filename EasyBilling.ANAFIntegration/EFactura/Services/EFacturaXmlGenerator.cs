@@ -72,6 +72,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
 
             elements.Add(CreateSupplierParty(invoice.Company!));
             elements.Add(CreateCustomerParty(invoice.Client!));
+            elements.Add(CreatePaymentMeans(invoice.BankAccount));
             elements.Add(CreateTaxTotal(taxTotal, taxGroups, currencyCode));
             elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal, currencyCode));
             elements.AddRange(CreateInvoiceLines(invoice.InvoiceLines, currencyCode));
@@ -142,6 +143,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
             elements.Add(CreateBillingReference(invoice.OriginalInvoice!));
             elements.Add(CreateSupplierParty(invoice.Company!));
             elements.Add(CreateCustomerParty(invoice.Client!));
+            elements.Add(CreatePaymentMeans(invoice.BankAccount));
             elements.Add(CreateTaxTotal(taxTotal, taxGroups, currencyCode));
             elements.Add(CreateLegalMonetaryTotal(lineExtensionTotal, taxTotal, currencyCode));
             elements.AddRange(CreateCreditNoteLines(invoice.InvoiceLines, currencyCode));
@@ -249,6 +251,19 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
                         new XElement(NS_CBC + "RegistrationName", client.Name))
                 )
             );
+        }
+
+        private XElement? CreatePaymentMeans(BankAccount? bankAccount)
+        {
+            if (bankAccount == null)
+                return null;
+
+            return new XElement(NS_CAC + "PaymentMeans",
+                new XElement(NS_CBC + "PaymentMeansCode", "42"),
+                new XElement(NS_CAC + "PayeeFinancialAccount",
+                    new XElement(NS_CBC + "ID", bankAccount.Iban),
+                    new XElement(NS_CAC + "FinancialInstitutionBranch",
+                        new XElement(NS_CBC + "Name", bankAccount.BankName))));
         }
 
         private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups, string currencyCode)

@@ -101,6 +101,12 @@ namespace EasyBilling.Infrastructure.Persistence
                     .HasForeignKey(e => e.OriginalInvoiceId)
                     .OnDelete(DeleteBehavior.Restrict);
 
+                entity.HasOne(e => e.BankAccount)
+                    .WithMany()
+                    .HasForeignKey(e => e.BankAccountId)
+                    .IsRequired(false)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(e => e.OriginalInvoiceId);
                 entity.HasIndex(e => e.Type);
             });

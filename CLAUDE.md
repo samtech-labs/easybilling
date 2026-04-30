@@ -366,10 +366,94 @@ public class BankAccount
 - All endpoints require `[Authorize]` + `HasActiveMembership` policy
 - Thin controller — delegate everything to `IBankAccountService`
 
-#### Future: Link to Invoices
-- Once bank accounts exist, the invoice form can offer a dropdown to select the supplier IBAN
-- The selected `BankAccountId` (or just the IBAN string) gets written into the invoice and used in UBL XML `cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID`
-- This is **out of scope** for the initial CRUD — just get the table and endpoints working first
+### Bank Account Selection on Invoice Creation
+
+**Goal:** When creating an invoice, after the user selects a company, fetch that company's bank accounts so the user can pick one. The selected bank account's IBAN and bank name flow through to the invoice PDF and the ANAF e-Factura UBL XML.
+
+**This touches the full invoice pipeline — be careful with every layer.**
+
+#### New Endpoint — Fetch Bank Accounts by Company
+
+- `GET /api/bank-accounts?companyId={companyId}` — or reuse existing `GET /api/bank-accounts` since it's already scoped to active company via `UserContext`
+- The frontend calls this **after company selection** on the invoice create/edit form to populate the bank account dropdown
+- Response: list of `BankAccountDto` (`id`, `bankName`, `iban`, `currency`)
+
+#### Domain (`EasyBilling.Domain`)
+
+- Add `Guid? BankAccountId` FK on `Invoice` entity (nullable — existing invoices won't have one)
+- Add `BankAccount? BankAccount` navigation property on `Invoice`
+- Relationship: optional many-to-one (`Invoice` → `BankAccount`), **restrict delete** — cannot delete a bank account that is referenced by invoices (or set null on delete, decide which is safer)
+- ⚠️ Do NOT cascade delete — deleting a bank account must not delete invoices
+
+#### Infrastructure (`EasyBilling.Infrastructure`)
+
+**AppDbContext — Fluent API:**
+- Configure `Invoice.BankAccountId` as optional FK to `BankAccount`
+- Delete behavior: `DeleteBehavior.Restrict` (prevent deleting bank accounts linked to invoices) or `SetNull` (clear the reference)
+- No index needed beyond the FK default
+
+**Migration:**
+- `dotnet ef migrations add AddBankAccountToInvoice --project EasyBilling.Infrastructure --startup-project EasyBilling.Presentation`
+- Adds nullable `BankAccountId` column to `invoices` table — no backfill needed (existing invoices get `NULL`)
+
+#### Application (`EasyBilling.Application`)
+
+**Requests:**
+- `CreateInvoiceRequest` / `UpdateInvoiceRequest` — add `Guid? BankAccountId` field (optional)
+- Validation: if provided, must reference a `BankAccount` that belongs to the **same company** as the invoice (IDOR guard)
+
+**DTOs:**
+- `InvoiceDto` — add `BankAccountId`, `BankAccountBankName`, `BankAccountIban` (flatten for frontend convenience, avoid nested DTO if not used elsewhere)
+
+**InvoiceService:**
+- On create/update: if `BankAccountId` is provided, load the `BankAccount`, verify it belongs to the same company, attach to invoice
+- If `BankAccountId` is null, invoice proceeds without bank details (backward compatible)
+- On invoice GET: eager-load or project the bank account fields into the DTO
+
+#### ANAF Integration (`EasyBilling.ANAFIntegration`)
+
+**This is the critical part.** The `EFacturaXmlGenerator` already has a `CreatePaymentMeans(PaymentInfo, currencyCode)` method that generates:
+
+```xml
+<cac:PaymentMeans>
+    <cbc:PaymentMeansCode>42</cbc:PaymentMeansCode>  <!-- 42 = bank transfer -->
+    <cac:PayeeFinancialAccount>
+        <cbc:ID>{IBAN}</cbc:ID>                       <!-- from BankAccount.Iban -->
+        <cac:FinancialInstitutionBranch>
+            <cbc:Name>{BankName}</cbc:Name>           <!-- from BankAccount.BankName -->
+        </cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+</cac:PaymentMeans>
+```
+
+**Changes needed:**
+- The `PaymentInfo` object (or whatever DTO feeds into `CreatePaymentMeans`) must be populated from `Invoice.BankAccount` when present
+- Map: `PaymentInfo.PaymentAccountId` ← `BankAccount.Iban`, `PaymentInfo.FinancialInstitutionName` ← `BankAccount.BankName`
+- `PaymentMeansCode` = `"42"` (credit transfer / bank transfer) — this is correct for Romanian B2B invoices
+- If no bank account is selected (`BankAccountId` is null), either:
+  - Omit `PaymentMeans` from XML entirely (allowed by ANAF for some invoice types), OR
+  - Keep existing fallback behavior (if any hardcoded values exist today, preserve them)
+- ⚠️ ANAF validates that `PayeeFinancialAccount/ID` is a valid IBAN format when present — the FluentValidation on `BankAccount.Iban` already covers this
+- ⚠️ For credit notes: if the original invoice had a bank account, the credit note should reference the same one (or allow override)
+
+#### QuestPDF (Invoice PDF Generation)
+
+- If `Invoice.BankAccount` is present, render bank details on the PDF:
+  - Bank name, IBAN, currency — typically in the footer or payment details section
+  - Format IBAN with spaces for readability: `RO49 AAAA 1B31 0075 9384 0000`
+- If no bank account selected, omit the section (same as current behavior)
+
+#### Presentation (`EasyBilling.Presentation`)
+
+- `InvoiceController` — no structural changes; `CreateInvoiceRequest` already flows through
+- Ensure `BankAccountId` is included in Swagger docs / request examples
+
+#### Key Risks & Edge Cases
+
+- **Company mismatch:** User creates invoice for Company A but passes a `BankAccountId` belonging to Company B → service must reject with 400/403
+- **Deleted bank account:** If using `SetNull` delete behavior, invoices lose their bank reference after deletion — acceptable if the IBAN was already baked into the submitted XML. If using `Restrict`, user must unlink bank account from all invoices before deleting it
+- **Already-submitted invoices:** Changing the bank account on an invoice that was already sent to ANAF has no effect on the submitted XML — but the UI should warn or prevent editing bank account on submitted invoices
+- **Currency mismatch:** A RON invoice with a EUR bank account is technically valid (payment can be in a different currency than the invoice) — don't block this, but consider a UI warning
 
 ### Other Active Items
 - [ ] ANAF OAuth token refresh edge cases (concurrent requests, refresh race condition)
