@@ -261,9 +261,7 @@ namespace EasyBilling.ANAFIntegration.EFactura.Services
             return new XElement(NS_CAC + "PaymentMeans",
                 new XElement(NS_CBC + "PaymentMeansCode", "42"),
                 new XElement(NS_CAC + "PayeeFinancialAccount",
-                    new XElement(NS_CBC + "ID", bankAccount.Iban),
-                    new XElement(NS_CAC + "FinancialInstitutionBranch",
-                        new XElement(NS_CBC + "Name", bankAccount.BankName))));
+                    new XElement(NS_CBC + "ID", bankAccount.Iban)));
         }
 
         private XElement CreateTaxTotal(decimal totalTax, Dictionary<decimal, (decimal taxableAmount, decimal taxAmount)> taxGroups, string currencyCode)
