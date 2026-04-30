@@ -3,6 +3,7 @@ using System;
 using EasyBilling.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyBilling.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428080004_AddBankAccount")]
+    partial class AddBankAccount
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -198,9 +201,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("BankAccountId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
@@ -240,8 +240,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .HasColumnType("numeric");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BankAccountId");
 
                     b.HasIndex("ClientId");
 
@@ -483,11 +481,6 @@ namespace EasyBilling.Infrastructure.Migrations
 
             modelBuilder.Entity("EasyBilling.Domain.Models.Invoice", b =>
                 {
-                    b.HasOne("EasyBilling.Domain.Models.BankAccount", "BankAccount")
-                        .WithMany()
-                        .HasForeignKey("BankAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("EasyBilling.Domain.Models.Client", "Client")
                         .WithMany()
                         .HasForeignKey("ClientId")
@@ -504,8 +497,6 @@ namespace EasyBilling.Infrastructure.Migrations
                         .WithMany("CreditNotes")
                         .HasForeignKey("OriginalInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("BankAccount");
 
                     b.Navigation("Client");
 

@@ -18,5 +18,6 @@
 
         public User User { get; set; } = null!;
         public ICollection<Client>? Clients { get; set; }
+        public ICollection<BankAccount>? BankAccounts { get; set; }
     }
 }

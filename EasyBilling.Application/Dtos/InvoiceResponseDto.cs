@@ -20,5 +20,8 @@ public class InvoiceResponseDto
 
     public CompanyResponseDto Company { get; set; } = default!;
     public ClientResponseDto Client { get; set; } = default!;
+    public Guid? BankAccountId { get; set; }
+    public string? BankAccountBankName { get; set; }
+    public string? BankAccountIban { get; set; }
     public List<InvoiceLineResponseDto> InvoiceLines { get; set; } = new();
 }

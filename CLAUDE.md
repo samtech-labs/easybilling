@@ -69,7 +69,7 @@ ANAFIntegration  (standalone, referenced by Application)
 Pure domain models, no external dependencies.
 
 **Entities:** `User`, `Company`, `Client`, `Invoice`, `InvoiceLine`, `AnafToken`,
-`InvoiceAnafSubmission`, `Membership`, `MembershipType`
+`InvoiceAnafSubmission`, `Membership`, `MembershipType`, `BankAccount`
 
 **Enums:**
 - `UserRole` — `ADMIN`, `USER`, `ACCOUNTANT`
@@ -82,6 +82,7 @@ Pure domain models, no external dependencies.
 - VAT rates: 19%, 9%, 5%, 0% (scutit), reverse charge (taxare inversa)
 - Multi-currency: RON and EUR supported; foreign currency invoices require exchange rate in UBL XML
 - Invoice line unit of measure is user-configurable (buc, ore, zi, luna, kg, m, mp, l, elem, set, etc.) — stored on each `InvoiceLine`
+- Bank accounts belong to a company (one-to-many); store bank name, IBAN, and currency (RON/EUR)
 
 ### EasyBilling.Application
 Business logic layer — **Repository + Service pattern** (no CQRS/MediatR).
@@ -91,6 +92,7 @@ Services/
   InvoiceService, EFacturaService, AnafIntegrationService
   ClientService, CompanyService, UserService
   MembershipService, MembershipTypeService, InvoiceAnafSubmissionService
+  BankAccountService
 Interfaces/
   Interfaces/Repositories/    ← repository contracts
   Interfaces/Services/        ← service contracts
@@ -122,7 +124,7 @@ ASP.NET Core host. **All DI registrations live in `Program.cs`** (no extension m
 
 ```
 Controllers/
-  Auth, Invoice, Company, Client, User, Membership, MembershipType, AnafIntegration
+  Auth, Invoice, Company, Client, User, Membership, MembershipType, AnafIntegration, BankAccount
 Authorization/
   CanCreateInvoice            ← enforces invoice limit per membership tier
   CanUseEFactura              ← gates e-invoice feature by membership tier
@@ -285,6 +287,173 @@ Common Romanian units: buc (piece), ore (hours), zile (days), luni (months), ele
 #### Migration
 - If `InvoiceLine.Unit` column already exists in DB with no default, add a migration setting default to `'buc'`
 - Backfill existing rows: `UPDATE invoice_lines SET unit = 'buc' WHERE unit IS NULL`
+
+### Company Bank Accounts — New Entity + Full CRUD
+
+**Goal:** Users can manage bank accounts per company. These will later be selectable on invoices (supplier IBAN in UBL XML).
+
+#### Domain (`EasyBilling.Domain`)
+
+New entity `BankAccount`:
+
+```csharp
+public class BankAccount
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Company Company { get; set; }
+    public string BankName { get; set; }    // e.g. "ING Bank", "BCR", "BT"
+    public string Iban { get; set; }        // RO-prefixed IBAN, 24 chars
+    public Currency Currency { get; set; }  // RON or EUR (reuse existing enum)
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+```
+
+- Relationship: `Company` has many `BankAccount` (one-to-many)
+- Add `ICollection<BankAccount> BankAccounts` navigation property on `Company`
+- A company can have multiple accounts (e.g. one RON, one EUR)
+- No unique constraint on IBAN per company — user may have multiple accounts at same bank
+
+#### Infrastructure (`EasyBilling.Infrastructure`)
+
+**AppDbContext** — Fluent API configuration:
+- `CompanyId` FK with cascade delete (deleting a company removes its bank accounts)
+- `BankName`: required, max length 100
+- `Iban`: required, max length 34 (ISO 13616 max)
+- `Currency`: stored as string conversion (same pattern as existing `Currency` enum usage)
+- Index on `CompanyId` for fast lookups
+
+**Repository:**
+- `IBankAccountRepository` interface in `Application/Interfaces/Repositories/`
+- `BankAccountRepository` implementation in `Infrastructure/Repositories/`
+- Methods: `GetByCompanyAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`
+- All queries scoped to company via `UserContext` — never return accounts from other companies
+
+**Migration:**
+- `dotnet ef migrations add AddBankAccount --project EasyBilling.Infrastructure --startup-project EasyBilling.Presentation`
+
+#### Application (`EasyBilling.Application`)
+
+**DTOs:**
+- `BankAccountDto` — `Id`, `BankName`, `Iban`, `Currency`, `CreatedAt`, `UpdatedAt`
+
+**Requests:**
+- `CreateBankAccountRequest` — `BankName` (required), `Iban` (required), `Currency` (required)
+- `UpdateBankAccountRequest` — same fields as create
+
+**Validation (FluentValidation):**
+- `BankName`: not empty, max 100 chars
+- `Iban`: not empty, max 34 chars, must match Romanian IBAN format (`^RO\d{2}[A-Z]{4}[A-Za-z0-9]{16}$`)
+- `Currency`: must be valid `Currency` enum value
+
+**Service:**
+- `IBankAccountService` / `BankAccountService`
+- Methods: `GetByCompanyAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`
+- All methods scoped to active company via `UserContext`
+- Throw if bank account belongs to a different company (guard against IDOR)
+
+**DI Registration:** Add repository + service in `Program.cs`
+
+#### Presentation (`EasyBilling.Presentation`)
+
+**Controller:** `BankAccountController`
+- `GET    /api/bank-accounts`          — list all for active company
+- `GET    /api/bank-accounts/{id}`     — get single
+- `POST   /api/bank-accounts`          — create
+- `PUT    /api/bank-accounts/{id}`     — update
+- `DELETE /api/bank-accounts/{id}`     — delete
+- All endpoints require `[Authorize]` + `HasActiveMembership` policy
+- Thin controller — delegate everything to `IBankAccountService`
+
+### Bank Account Selection on Invoice Creation
+
+**Goal:** When creating an invoice, after the user selects a company, fetch that company's bank accounts so the user can pick one. The selected bank account's IBAN and bank name flow through to the invoice PDF and the ANAF e-Factura UBL XML.
+
+**This touches the full invoice pipeline — be careful with every layer.**
+
+#### New Endpoint — Fetch Bank Accounts by Company
+
+- `GET /api/bank-accounts?companyId={companyId}` — or reuse existing `GET /api/bank-accounts` since it's already scoped to active company via `UserContext`
+- The frontend calls this **after company selection** on the invoice create/edit form to populate the bank account dropdown
+- Response: list of `BankAccountDto` (`id`, `bankName`, `iban`, `currency`)
+
+#### Domain (`EasyBilling.Domain`)
+
+- Add `Guid? BankAccountId` FK on `Invoice` entity (nullable — existing invoices won't have one)
+- Add `BankAccount? BankAccount` navigation property on `Invoice`
+- Relationship: optional many-to-one (`Invoice` → `BankAccount`), **restrict delete** — cannot delete a bank account that is referenced by invoices (or set null on delete, decide which is safer)
+- ⚠️ Do NOT cascade delete — deleting a bank account must not delete invoices
+
+#### Infrastructure (`EasyBilling.Infrastructure`)
+
+**AppDbContext — Fluent API:**
+- Configure `Invoice.BankAccountId` as optional FK to `BankAccount`
+- Delete behavior: `DeleteBehavior.Restrict` (prevent deleting bank accounts linked to invoices) or `SetNull` (clear the reference)
+- No index needed beyond the FK default
+
+**Migration:**
+- `dotnet ef migrations add AddBankAccountToInvoice --project EasyBilling.Infrastructure --startup-project EasyBilling.Presentation`
+- Adds nullable `BankAccountId` column to `invoices` table — no backfill needed (existing invoices get `NULL`)
+
+#### Application (`EasyBilling.Application`)
+
+**Requests:**
+- `CreateInvoiceRequest` / `UpdateInvoiceRequest` — add `Guid? BankAccountId` field (optional)
+- Validation: if provided, must reference a `BankAccount` that belongs to the **same company** as the invoice (IDOR guard)
+
+**DTOs:**
+- `InvoiceDto` — add `BankAccountId`, `BankAccountBankName`, `BankAccountIban` (flatten for frontend convenience, avoid nested DTO if not used elsewhere)
+
+**InvoiceService:**
+- On create/update: if `BankAccountId` is provided, load the `BankAccount`, verify it belongs to the same company, attach to invoice
+- If `BankAccountId` is null, invoice proceeds without bank details (backward compatible)
+- On invoice GET: eager-load or project the bank account fields into the DTO
+
+#### ANAF Integration (`EasyBilling.ANAFIntegration`)
+
+**This is the critical part.** The `EFacturaXmlGenerator` already has a `CreatePaymentMeans(PaymentInfo, currencyCode)` method that generates:
+
+```xml
+<cac:PaymentMeans>
+    <cbc:PaymentMeansCode>42</cbc:PaymentMeansCode>  <!-- 42 = bank transfer -->
+    <cac:PayeeFinancialAccount>
+        <cbc:ID>{IBAN}</cbc:ID>                       <!-- from BankAccount.Iban -->
+        <cac:FinancialInstitutionBranch>
+            <cbc:Name>{BankName}</cbc:Name>           <!-- from BankAccount.BankName -->
+        </cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+</cac:PaymentMeans>
+```
+
+**Changes needed:**
+- The `PaymentInfo` object (or whatever DTO feeds into `CreatePaymentMeans`) must be populated from `Invoice.BankAccount` when present
+- Map: `PaymentInfo.PaymentAccountId` ← `BankAccount.Iban`, `PaymentInfo.FinancialInstitutionName` ← `BankAccount.BankName`
+- `PaymentMeansCode` = `"42"` (credit transfer / bank transfer) — this is correct for Romanian B2B invoices
+- If no bank account is selected (`BankAccountId` is null), either:
+  - Omit `PaymentMeans` from XML entirely (allowed by ANAF for some invoice types), OR
+  - Keep existing fallback behavior (if any hardcoded values exist today, preserve them)
+- ⚠️ ANAF validates that `PayeeFinancialAccount/ID` is a valid IBAN format when present — the FluentValidation on `BankAccount.Iban` already covers this
+- ⚠️ For credit notes: if the original invoice had a bank account, the credit note should reference the same one (or allow override)
+
+#### QuestPDF (Invoice PDF Generation)
+
+- If `Invoice.BankAccount` is present, render bank details on the PDF:
+  - Bank name, IBAN, currency — typically in the footer or payment details section
+  - Format IBAN with spaces for readability: `RO49 AAAA 1B31 0075 9384 0000`
+- If no bank account selected, omit the section (same as current behavior)
+
+#### Presentation (`EasyBilling.Presentation`)
+
+- `InvoiceController` — no structural changes; `CreateInvoiceRequest` already flows through
+- Ensure `BankAccountId` is included in Swagger docs / request examples
+
+#### Key Risks & Edge Cases
+
+- **Company mismatch:** User creates invoice for Company A but passes a `BankAccountId` belonging to Company B → service must reject with 400/403
+- **Deleted bank account:** If using `SetNull` delete behavior, invoices lose their bank reference after deletion — acceptable if the IBAN was already baked into the submitted XML. If using `Restrict`, user must unlink bank account from all invoices before deleting it
+- **Already-submitted invoices:** Changing the bank account on an invoice that was already sent to ANAF has no effect on the submitted XML — but the UI should warn or prevent editing bank account on submitted invoices
+- **Currency mismatch:** A RON invoice with a EUR bank account is technically valid (payment can be in a different currency than the invoice) — don't block this, but consider a UI warning
 
 ### Other Active Items
 - [ ] ANAF OAuth token refresh edge cases (concurrent requests, refresh race condition)

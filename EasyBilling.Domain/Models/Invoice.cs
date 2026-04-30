@@ -20,9 +20,11 @@ namespace EasyBilling.Domain.Models
 
         public required Guid CompanyId { get; set; }
         public required Guid ClientId { get; set; }
+        public Guid? BankAccountId { get; set; }
 
         public Client Client { get; set; } = null!;
         public Company Company { get; set; } = null!;
+        public BankAccount? BankAccount { get; set; }
         public ICollection<InvoiceLine>? InvoiceLines { get; set; }
         public ICollection<InvoiceAnafSubmission>? AnafSubmissions { get; set; }
         public ICollection<Invoice> CreditNotes { get; set; } = [];

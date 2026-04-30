@@ -14,6 +14,7 @@ namespace EasyBilling.Application.Requests
         public Guid? ClientId { get; set; }
         public string? ClientCui { get; set; }
         public ClientDetailsRequest? ClientDetails { get; set; }
+        public Guid? BankAccountId { get; set; }
         public required List<CreateInvoiceLineRequest> InvoiceLines { get; set; }
         public string? Notes { get; set; }
     }

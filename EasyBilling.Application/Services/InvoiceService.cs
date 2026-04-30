@@ -17,6 +17,7 @@ namespace EasyBilling.Application.Services
         ICompanyService companyService,
         IUserService userService,
         IClientRepository clientRepository,
+        IBankAccountRepository bankAccountRepository,
         IEFacturaXmlGenerator eFacturaXmlGenerator,
         IInvoiceAnafSubmissionRepository anafSubmissionRepository,
         IEFacturaService eFacturaService) : IInvoiceService
@@ -25,6 +26,7 @@ namespace EasyBilling.Application.Services
         private readonly ICompanyService _companyService = companyService;
         private readonly IUserService _userService = userService;
         private readonly IClientRepository _clientRepository = clientRepository;
+        private readonly IBankAccountRepository _bankAccountRepository = bankAccountRepository;
         private readonly IEFacturaXmlGenerator _eFacturaXmlGenerator = eFacturaXmlGenerator;
         private readonly IInvoiceAnafSubmissionRepository _anafSubmissionRepository = anafSubmissionRepository;
         private readonly IEFacturaService _eFacturaService = eFacturaService;
@@ -40,6 +42,19 @@ namespace EasyBilling.Application.Services
             if (company == null)
             {
                 throw new InvalidOperationException($"Company with ID '{companyId}' does not exist.");
+            }
+
+            // Validate bank account (if provided) belongs to the same company
+            BankAccount? bankAccount = null;
+            if (request.BankAccountId.HasValue)
+            {
+                bankAccount = await _bankAccountRepository.GetByIdAsync(request.BankAccountId.Value, cancellationToken)
+                    ?? throw new InvalidOperationException($"Bank account with ID '{request.BankAccountId}' does not exist.");
+
+                if (bankAccount.CompanyId != companyId)
+                {
+                    throw new InvalidOperationException("Bank account does not belong to the specified company.");
+                }
             }
 
             // Validate invoice lines
@@ -192,6 +207,7 @@ namespace EasyBilling.Application.Services
                 Currency = request.Currency,
                 CompanyId = companyId,
                 ClientId = clientId,
+                BankAccountId = bankAccount?.Id,
                 InvoiceLines = request.InvoiceLines.Select(line =>
                 {
                     var vatRate = line.VatRate > 0 ? line.VatRate : (line.Vat ?? 0);
@@ -234,6 +250,9 @@ namespace EasyBilling.Application.Services
                     Bank = company.Bank
                 },
                 Client = clientDto,
+                BankAccountId = bankAccount?.Id,
+                BankAccountBankName = bankAccount?.BankName,
+                BankAccountIban = bankAccount?.Iban,
                 InvoiceLines = invoice.InvoiceLines!.Select(line => new InvoiceLineResponseDto
                 {
                     Id = line.Id,
@@ -401,6 +420,14 @@ namespace EasyBilling.Application.Services
             decimal totalVat = lines.Sum(l => l.Quantity * l.UnitPrice * l.VatRate / 100);
             decimal grandTotal = subtotal + totalVat;
 
+            // Bank details: prefer the invoice's selected bank account, fall back to legacy Company fields
+            var bankIban = invoice.BankAccount?.Iban ?? invoice.Company.IBAN;
+            var bankName = invoice.BankAccount?.BankName ?? invoice.Company.Bank;
+            var bankIbanDisplay = FormatIbanForDisplay(bankIban);
+            var ibanLabel = invoice.BankAccount != null
+                ? $"IBAN ({GetCurrencyLabel(invoice.BankAccount.Currency)}):"
+                : "IBAN:";
+
             var pdfBytes = Document.Create(container =>
             {
                 container.Page(page =>
@@ -480,8 +507,8 @@ namespace EasyBilling.Application.Services
                                         AddDetailRow(t, "Reg. com.:", invoice.Company.RegNumber, mutedText);
                                         AddDetailRow(t, "Adresa:", invoice.Company.Address, mutedText);
                                         AddDetailRow(t, "Județ:", invoice.Company.County, mutedText);
-                                        AddDetailRow(t, "IBAN:", invoice.Company.IBAN, mutedText);
-                                        AddDetailRow(t, "Banca:", invoice.Company.Bank, mutedText);
+                                        AddDetailRow(t, ibanLabel, bankIbanDisplay, mutedText);
+                                        AddDetailRow(t, "Banca:", bankName, mutedText);
                                     });
                                 });
 
@@ -678,8 +705,8 @@ namespace EasyBilling.Application.Services
 
                             row.RelativeItem().AlignCenter().Column(c =>
                             {
-                                c.Item().Text($"IBAN: {invoice.Company.IBAN}").Style(footerStyle);
-                                c.Item().Text($"Banca: {invoice.Company.Bank}").Style(footerStyle);
+                                c.Item().Text($"{ibanLabel} {bankIbanDisplay}").Style(footerStyle);
+                                c.Item().Text($"Banca: {bankName}").Style(footerStyle);
                             });
 
                             row.RelativeItem().AlignRight().Column(c =>
@@ -704,6 +731,16 @@ namespace EasyBilling.Application.Services
             }).GeneratePdf();
 
             return pdfBytes;
+        }
+
+        private static string? FormatIbanForDisplay(string? iban)
+        {
+            if (string.IsNullOrWhiteSpace(iban))
+                return iban;
+
+            var compact = iban.Replace(" ", "").Trim();
+            return string.Join(" ", Enumerable.Range(0, (compact.Length + 3) / 4)
+                .Select(i => compact.Substring(i * 4, Math.Min(4, compact.Length - i * 4))));
         }
 
         // Helper method — add to the same class
@@ -785,6 +822,9 @@ namespace EasyBilling.Application.Services
                     Bank = invoice.Company.Bank
                 },
                 Client = MapClientToDto(invoice.Client),
+                BankAccountId = invoice.BankAccountId,
+                BankAccountBankName = invoice.BankAccount?.BankName,
+                BankAccountIban = invoice.BankAccount?.Iban,
                 InvoiceLines = invoice.InvoiceLines?.Select(line => new InvoiceLineResponseDto
                 {
                     Id = line.Id,
@@ -800,7 +840,7 @@ namespace EasyBilling.Application.Services
         private static string GetCurrencyLabel(Currency currency) => currency switch
         {
             Currency.EUR => "EUR",
-            _ => "Lei"
+            _ => "RON"
         };
 
         public async Task<AnafSubmissionStatusDto> GetAnafSubmissionStatusAsync(Guid invoiceId, CancellationToken cancellationToken = default)
@@ -947,6 +987,7 @@ namespace EasyBilling.Application.Services
                 Vat = totalVat,
                 CompanyId = originalInvoice.CompanyId,
                 ClientId = originalInvoice.ClientId,
+                BankAccountId = originalInvoice.BankAccountId,
                 OriginalInvoiceId = originalInvoice.Id,
                 InvoiceLines = lines
             };

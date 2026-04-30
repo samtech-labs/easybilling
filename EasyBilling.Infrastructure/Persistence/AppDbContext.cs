@@ -14,6 +14,7 @@ namespace EasyBilling.Infrastructure.Persistence
         public DbSet<InvoiceAnafSubmission> InvoiceAnafSubmissions { get; set; }
         public DbSet<MembershipType> MembershipTypes { get; set; }
         public DbSet<Membership> Memberships { get; set; }
+        public DbSet<BankAccount> BankAccounts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +46,33 @@ namespace EasyBilling.Infrastructure.Persistence
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<BankAccount>(entity =>
+            {
+                entity.ToTable("BankAccounts");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.BankName)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.Iban)
+                    .HasMaxLength(34)
+                    .IsRequired();
+
+                entity.Property(e => e.Currency)
+                    .HasConversion<string>()
+                    .HasMaxLength(3);
+
+                entity.HasOne(e => e.Company)
+                    .WithMany(c => c.BankAccounts)
+                    .HasForeignKey(e => e.CompanyId)
+                    .IsRequired()
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.CompanyId);
+            });
+
             modelBuilder.Entity<InvoiceLine>(entity =>
             {
                 entity.Property(il => il.Unit)
@@ -71,6 +99,12 @@ namespace EasyBilling.Infrastructure.Persistence
                 entity.HasOne(e => e.OriginalInvoice)
                     .WithMany(e => e.CreditNotes)
                     .HasForeignKey(e => e.OriginalInvoiceId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.BankAccount)
+                    .WithMany()
+                    .HasForeignKey(e => e.BankAccountId)
+                    .IsRequired(false)
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(e => e.OriginalInvoiceId);

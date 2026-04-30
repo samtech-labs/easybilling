@@ -17,7 +17,7 @@ namespace EasyBilling.Infrastructure.Repositories
         }
 
         public async Task<Invoice?> GetByIdWithDetailsAsync(
-            Guid invoiceId, 
+            Guid invoiceId,
             CancellationToken cancellationToken = default)
         {
             return await _db.Invoices
@@ -25,6 +25,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
                 .Include(i => i.OriginalInvoice)
+                .Include(i => i.BankAccount)
                 .FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
         }
 
@@ -36,6 +37,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Company)
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
+                .Include(i => i.BankAccount)
                 .Where(i => i.CompanyId == companyId)
                 .Where(i => i.Type == InvoiceType.Invoice)
                 .OrderByDescending(i => i.Date)
@@ -51,6 +53,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Company)
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
+                .Include(i => i.BankAccount)
                 .Where(i => i.CompanyId == companyId)
                 .Where(i => i.Type == InvoiceType.Invoice)
                 .AsQueryable();
@@ -105,6 +108,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
                 .Include(i => i.OriginalInvoice)
+                .Include(i => i.BankAccount)
                 .Where(i => i.CompanyId == companyId)
                 .Where(i => i.Type == InvoiceType.CreditNote)
                 .OrderByDescending(i => i.Date)
@@ -121,6 +125,7 @@ namespace EasyBilling.Infrastructure.Repositories
                 .Include(i => i.Client)
                 .Include(i => i.InvoiceLines)
                 .Include(i => i.OriginalInvoice)
+                .Include(i => i.BankAccount)
                 .Where(i => i.CompanyId == companyId)
                 .Where(i => i.Type == InvoiceType.CreditNote)
                 .AsQueryable();
